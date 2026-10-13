@@ -22,6 +22,8 @@ async function bootstrap() {
   // UI em /docs e especificação OpenAPI em /docs-json (importável no Postman)
   SwaggerModule.setup('docs', app, document, {
     jsonDocumentUrl: 'docs-json',
+    // Mantém o token informado em "Authorize" ao recarregar a página
+    swaggerOptions: { persistAuthorization: true },
   });
 
   await app.listen(process.env.PORT ?? 3000);

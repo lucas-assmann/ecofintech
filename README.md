@@ -55,6 +55,16 @@ findByEmail(email: string) {
 ```
 
 Para operações atômicas (ex.: transferência), use `this.prisma.$transaction(...)`. Para SQL direto, `this.prisma.$queryRaw`.
+## Autenticação
+
+Login com JWT: `POST /auth/login` recebe `email` e `password` e devolve um `access_token`. Envie-o nas requisições no header `Authorization: Bearer <token>`. O segredo e a validade ficam em `JWT_SECRET` e `JWT_EXPIRES_IN` (segundos) no `.env`.
+
+- **Toda rota exige token por padrão** (guard global em `src/common/guards/auth.guard.ts`). Para liberar uma rota, use `@Public()`. Hoje são públicas: `GET /`, `POST /users` (cadastro) e `POST /auth/login`.
+- Para pegar o usuário logado num controller, use `@CurrentUser() user: JwtPayload` (`user.sub` é o id).
+- `GET /auth/me` devolve os dados do usuário logado.
+- Nas rotas `/users/:id`, o id precisa ser o do usuário logado; caso contrário, 403.
+- No Swagger, clique em **Authorize** e cole o token.
+
 ## Documentação da API
 
 Com a API rodando:

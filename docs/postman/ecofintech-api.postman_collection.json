@@ -1,12 +1,20 @@
 {
   "info": {
     "name": "Ecofintech API",
-    "description": "Requests da API da Ecofintech.\n\nVariáveis da collection:\n- `base_url`: endereço da API (padrão http://localhost:3000)\n- `user_id`: preenchida automaticamente ao rodar **Criar usuário**",
+    "description": "Requests da API da Ecofintech.\n\n**Fluxo:** Auth → Cadastrar → Login (salva o token) → demais requests. Rodando a collection inteira (*Run collection*), tudo acontece nessa ordem e o usuário de teste é removido no fim.\n\nA autenticação (Bearer `{{token}}`) é configurada na collection e herdada por todas as requests; as públicas usam *No Auth*.\n\nVariáveis:\n- `base_url`: endereço da API\n- `user_email` / `user_password`: credenciais do usuário cadastrado\n- `user_new_password`: usada em Alterar senha (as duas trocam de lugar após a troca)\n- `user_id`, `token`: preenchidas automaticamente",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
   },
   "variable": [
     { "key": "base_url", "value": "http://localhost:3000", "type": "string" },
+    { "key": "user_email", "value": "", "type": "string" },
+    { "key": "user_password", "value": "senhaForte123", "type": "string" },
+    { "key": "user_new_password", "value": "novaSenha456", "type": "string" },
     { "key": "user_id", "value": "", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
     { "key": "account_id", "value": "1", "type": "string" },
     { "key": "transaction_id", "value": "1", "type": "string" }
   ],
@@ -17,9 +25,10 @@
         {
           "name": "Verificar API",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "url": "{{base_url}}/",
-            "description": "Verifica se a API está no ar."
+            "description": "Verifica se a API está no ar. Pública."
           },
           "event": [
             {
@@ -36,20 +45,21 @@
       ]
     },
     {
-      "name": "Users",
+      "name": "Auth",
       "item": [
         {
-          "name": "Criar usuário",
+          "name": "Cadastrar",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{base_url}}/users",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Maria Silva\",\n  \"email\": \"maria.{{$timestamp}}@email.com\",\n  \"date_of_birth\": \"1995-08-20\",\n  \"password\": \"senhaForte123\"\n}",
+              "raw": "{\n  \"name\": \"Maria Silva\",\n  \"email\": \"maria.{{$timestamp}}@email.com\",\n  \"date_of_birth\": \"1995-08-20\",\n  \"password\": \"{{user_password}}\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "description": "Cadastra um usuário. Salva o `id` retornado na variável `user_id`. O e-mail usa `{{$timestamp}}` para ser único a cada execução.\n\nErros: 400 (dados inválidos), 409 (e-mail já cadastrado)."
+            "description": "Cadastra um usuário (POST /users). Pública.\n\nSalva `user_id` e `user_email` para o Login. O e-mail usa `{{$timestamp}}` para ser único a cada execução.\n\nErros: 400 (dados inválidos), 409 (e-mail já cadastrado)."
           },
           "event": [
             {
@@ -65,12 +75,72 @@
                   "  pm.expect(user).to.not.have.property('password_hash');",
                   "});",
                   "",
-                  "if (user.id) pm.collectionVariables.set('user_id', user.id);"
+                  "if (user.id) {",
+                  "  pm.collectionVariables.set('user_id', user.id);",
+                  "  pm.collectionVariables.set('user_email', user.email);",
+                  "}"
                 ]
               }
             }
           ]
         },
+        {
+          "name": "Login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Faz login e devolve o token. Pública.\n\nSalva o token na variável `token`, usada automaticamente pelas outras requests.\n\nErros: 401 (e-mail ou senha inválidos)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('Devolve o token', () => pm.expect(body.access_token).to.be.a('string'));",
+                  "",
+                  "if (body.access_token) pm.collectionVariables.set('token', body.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Usuário logado (me)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/auth/me",
+            "description": "Devolve os dados do usuário dono do token.\n\nErros: 401 (token ausente, inválido ou expirado)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('É o usuário logado', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('user_id')));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "description": "Exigem token. Nas rotas com `:id`, o id precisa ser o do usuário logado (senão 403).",
+      "item": [
         {
           "name": "Listar usuários",
           "request": {
@@ -96,7 +166,7 @@
           "request": {
             "method": "GET",
             "url": "{{base_url}}/users/{{user_id}}",
-            "description": "Busca um usuário pelo id.\n\nErros: 400 (id não é UUID), 404 (não encontrado)."
+            "description": "Busca o usuário pelo id.\n\nErros: 400 (id não é UUID), 401, 403 (não é o próprio usuário), 404."
           },
           "event": [
             {
@@ -121,7 +191,7 @@
               "raw": "{\n  \"name\": \"Maria S. Souza\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "description": "Atualiza só os campos enviados (`name`, `email`, `date_of_birth`). A senha não é aceita aqui: use **Alterar senha**.\n\nErros: 400, 404, 409."
+            "description": "Atualiza só os campos enviados (`name`, `email`, `date_of_birth`). A senha não é aceita aqui: use **Alterar senha**.\n\nErros: 400, 401, 403, 404, 409."
           },
           "event": [
             {
@@ -143,10 +213,10 @@
             "url": "{{base_url}}/users/{{user_id}}/password",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"current_password\": \"senhaForte123\",\n  \"new_password\": \"novaSenha456\"\n}",
+              "raw": "{\n  \"current_password\": \"{{user_password}}\",\n  \"new_password\": \"{{user_new_password}}\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "description": "Altera a senha do usuário. Exige a senha atual.\n\nErros: 400 (senha atual incorreta ou nova senha inválida), 404."
+            "description": "Altera a senha. Exige a senha atual.\n\nApós a troca, `user_password` e `user_new_password` trocam de lugar, então o Login continua funcionando e esta request pode rodar de novo.\n\nErros: 400 (senha atual incorreta ou nova senha inválida), 401, 403, 404."
           },
           "event": [
             {
@@ -154,7 +224,13 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));",
+                  "",
+                  "if (pm.response.code === 204) {",
+                  "  const current = pm.collectionVariables.get('user_password');",
+                  "  pm.collectionVariables.set('user_password', pm.collectionVariables.get('user_new_password'));",
+                  "  pm.collectionVariables.set('user_new_password', current);",
+                  "}"
                 ]
               }
             }
@@ -165,7 +241,7 @@
           "request": {
             "method": "DELETE",
             "url": "{{base_url}}/users/{{user_id}}",
-            "description": "Remove um usuário.\n\nErros: 400, 404."
+            "description": "Remove o próprio usuário.\n\nErros: 400, 401, 403, 404."
           },
           "event": [
             {
@@ -183,7 +259,7 @@
     },
     {
       "name": "Accounts",
-      "description": "Rotas ainda são o esqueleto gerado pela CLI (sem banco).",
+      "description": "Exigem token. Rotas ainda são o esqueleto gerado pela CLI (sem banco).",
       "item": [
         {
           "name": "Criar conta",
@@ -233,7 +309,7 @@
     },
     {
       "name": "Transactions",
-      "description": "Rotas ainda são o esqueleto gerado pela CLI (sem banco).",
+      "description": "Exigem token. Rotas ainda são o esqueleto gerado pela CLI (sem banco).",
       "item": [
         {
           "name": "Criar transação",
@@ -280,11 +356,6 @@
           }
         }
       ]
-    },
-    {
-      "name": "Auth",
-      "description": "Ainda sem rotas. Login e cadastro entram aqui.",
-      "item": []
     }
   ]
 }
