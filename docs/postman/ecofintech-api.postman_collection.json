@@ -354,7 +354,7 @@
     },
     {
       "name": "Users",
-      "description": "Exigem token. Nas rotas com `:id`, o id precisa ser o do usuário logado (senão 403).",
+      "description": "Exigem token. Buscar, Atualizar e Alterar senha só funcionam no próprio usuário (senão 403). Listar e Remover são somente admin.",
       "item": [
         {
           "name": "Listar usuários",
@@ -454,13 +454,28 @@
           ]
         },
         {
-          "name": "Remover usuário",
+          "name": "Remover usuário (admin)",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{admin_token}}", "type": "string" }
+              ]
+            },
             "method": "DELETE",
             "url": "{{base_url}}/users/{{user_id}}",
-            "description": "Remove o próprio usuário (e a conta).\n\nSe a conta tiver movimentações, retorna 409: o histórico financeiro não pode ser apagado.\n\nErros: 400, 401, 403, 404, 409."
+            "description": "Remove um usuário (e a conta). **Somente admin** (usa `admin_token`).\n\nSe a conta tiver movimentações, retorna 409: o histórico financeiro não pode ser apagado.\n\nPulada se `admin_token` estiver vazio.\n\nErros: 400, 401, 403 (não é admin), 404, 409."
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {

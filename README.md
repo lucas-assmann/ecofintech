@@ -62,7 +62,7 @@ Login com JWT: `POST /auth/login` recebe `email` e `password` e devolve um `acce
 - **Toda rota exige token por padrão** (guard global em `src/common/guards/auth.guard.ts`). Para liberar uma rota, use `@Public()`. Hoje são públicas: `GET /`, `POST /users` (cadastro) e `POST /auth/login`.
 - Para pegar o usuário logado num controller, use `@CurrentUser() user: JwtPayload` (`user.sub` é o id).
 - `GET /auth/me` devolve os dados do usuário logado.
-- Nas rotas `/users/:id`, o id precisa ser o do usuário logado; caso contrário, 403.
+- `GET`, `PATCH /users/:id` e `PATCH /users/:id/password` só funcionam no próprio usuário; caso contrário, 403.
 - No Swagger, clique em **Authorize** e cole o token.
 
 ### Perfis (roles)
@@ -75,7 +75,7 @@ Ninguém vira admin pela API (o campo `role` é recusado no cadastro e no update
 UPDATE users SET role = 'admin' WHERE email = 'fulano@email.com';
 ```
 
-Hoje só `GET /users` (listar todos) é exclusiva de admin.
+Rotas exclusivas de admin: `GET /users` (listar todos), `DELETE /users/:id` (remover usuário) e `POST /transactions/deposit` (depósito).
 
 ## Saldo e movimentações
 

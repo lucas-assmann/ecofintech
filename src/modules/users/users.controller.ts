@@ -106,16 +106,16 @@ export class UsersController {
   }
 
   @Delete(':id')
+  @Roles('admin')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Remove um usuário' })
+  @ApiOperation({ summary: 'Remove um usuário (somente admin)' })
   @ApiNoContentResponse({ description: 'Usuário removido' })
   @ApiNotFoundResponse({ description: 'Usuário não encontrado' })
-  @ApiForbiddenResponse({ description: 'O id não é o do usuário logado' })
-  remove(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
-    assertSelf(user, id);
+  @ApiForbiddenResponse({ description: 'Usuário não é admin' })
+  @ApiConflictResponse({
+    description: 'Usuário possui movimentações financeiras',
+  })
+  remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.remove(id);
   }
 }
