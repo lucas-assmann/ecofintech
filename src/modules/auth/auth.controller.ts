@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -36,8 +38,20 @@ export class AuthController {
   @ApiOperation({ summary: 'Faz login e devolve o token de acesso' })
   @ApiOkResponse({ type: LoginResponseDto })
   @ApiUnauthorizedResponse({ description: 'E-mail ou senha inválidos' })
+  @ApiForbiddenResponse({ description: 'Conta desativada' })
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Encerra a sessão (invalida todos os tokens do usuário)',
+  })
+  @ApiNoContentResponse({ description: 'Sessão encerrada' })
+  logout(@CurrentUser() user: JwtPayload) {
+    return this.authService.logout(user.sub);
   }
 
   @Get('me')

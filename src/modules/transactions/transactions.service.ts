@@ -35,7 +35,7 @@ export class TransactionsService {
 
   /** Entrada de dinheiro vindo de fora (só admin). Gera um lançamento de entrada. */
   async deposit(dto: DepositDto): Promise<Transaction> {
-    const account_id = await this.findAccountIdByEmail(dto.to_email);
+    const account_id = await this.findRecipientAccountId(dto);
     const amount = new Prisma.Decimal(dto.amount);
 
     // $transaction: tudo dentro roda numa transação do banco (BEGIN/COMMIT).
@@ -69,7 +69,7 @@ export class TransactionsService {
    */
   async transfer(user_id: string, dto: TransferDto): Promise<Transaction> {
     const from = await this.findAccountIdByUser(user_id);
-    const to = await this.findAccountIdByEmail(dto.to_email);
+    const to = await this.findRecipientAccountId(dto);
     if (from === to) {
       throw new BadRequestException(
         'Não é possível transferir para a própria conta',
@@ -180,12 +180,25 @@ export class TransactionsService {
     return account.id;
   }
 
-  private async findAccountIdByEmail(email: string): Promise<string> {
+  /** Conta de quem vai receber, identificada por to_email ou to_cpf. */
+  private async findRecipientAccountId(dto: TransferDto): Promise<string> {
+    if (!dto.to_email === !dto.to_cpf) {
+      throw new BadRequestException(
+        'Informe o destinatário por to_email ou to_cpf (apenas um dos dois)',
+      );
+    }
     const account = await this.prisma.accounts.findFirst({
-      where: { users: { email: email.toLowerCase() } },
-      select: { id: true },
+      where: {
+        users: dto.to_email
+          ? { email: dto.to_email.toLowerCase() }
+          : { cpf: dto.to_cpf },
+      },
+      select: { id: true, users: { select: { status: true } } },
     });
     if (!account) throw new NotFoundException('Destinatário não encontrado');
+    if (account.users.status !== 'active') {
+      throw new UnprocessableEntityException('Conta de destino desativada');
+    }
     return account.id;
   }
 }

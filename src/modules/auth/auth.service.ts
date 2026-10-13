@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../database/prisma.service.js';
@@ -26,7 +30,13 @@ export class AuthService {
   async login(dto: LoginDto): Promise<LoginResponseDto> {
     const user = await this.prisma.users.findUnique({
       where: { email: dto.email.toLowerCase() },
-      select: { id: true, email: true, password_hash: true },
+      select: {
+        id: true,
+        email: true,
+        password_hash: true,
+        status: true,
+        token_version: true,
+      },
     });
 
     const valid = await verifyPassword(
@@ -37,12 +47,28 @@ export class AuthService {
     if (!user || !valid) {
       throw new UnauthorizedException('E-mail ou senha inválidos');
     }
+    // Só informa a desativação depois de confirmar a senha
+    if (user.status !== 'active') {
+      throw new ForbiddenException('Conta desativada');
+    }
 
-    const payload: JwtPayload = { sub: user.id, email: user.email };
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      ver: user.token_version,
+    };
     return {
       access_token: await this.jwt.signAsync(payload),
       token_type: 'Bearer',
       expires_in: this.expiresIn,
     };
+  }
+
+  /** Encerra a sessão: invalida todos os tokens do usuário. */
+  async logout(user_id: string): Promise<void> {
+    await this.prisma.users.update({
+      where: { id: user_id },
+      data: { token_version: { increment: 1 } },
+    });
   }
 }

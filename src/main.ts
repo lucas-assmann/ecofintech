@@ -6,6 +6,14 @@ import { AppModule } from './app.module.js';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // CORS: só os endereços do front listados em CORS_ORIGINS podem chamar a API
+  // pelo navegador. O token vai no header Authorization (sem cookies).
+  const corsOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  app.enableCors({ origin: corsOrigins });
+
   // Valida os DTOs de entrada; campos desconhecidos geram erro 400.
   // transform: converte query params (texto) para os tipos do DTO (ex.: limit → number)
   app.useGlobalPipes(

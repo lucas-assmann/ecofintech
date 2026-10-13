@@ -1,9 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import { Prisma } from '../../database/generated/prisma/client.js';
 import { hashPassword, verifyPassword } from '../../common/utils/password.js';
@@ -50,6 +46,8 @@ describe('UsersService', () => {
       name: 'Maria Silva',
       email: 'Maria@Email.com',
       date_of_birth: '1995-08-20',
+      cpf: '52998224725',
+      phone: '11987654321',
       password: 'senhaForte123',
     };
 
@@ -71,9 +69,15 @@ describe('UsersService', () => {
     it('lança Conflict quando o e-mail já existe', async () => {
       prisma.users.create.mockRejectedValue(prismaError('P2002'));
 
-      await expect(service.create(dto)).rejects.toBeInstanceOf(
-        ConflictException,
-      );
+      await expect(service.create(dto)).rejects.toThrow('E-mail já cadastrado');
+    });
+
+    it('lança Conflict com mensagem de CPF quando o CPF já existe', async () => {
+      const error = prismaError('P2002');
+      error.meta = { target: ['cpf'] };
+      prisma.users.create.mockRejectedValue(error);
+
+      await expect(service.create(dto)).rejects.toThrow('CPF já cadastrado');
     });
   });
 
@@ -113,11 +117,13 @@ describe('UsersService', () => {
       await service.updatePassword('1', dto);
 
       const { data } = prisma.users.update.mock.calls[0][0] as {
-        data: { password_hash: string };
+        data: { password_hash: string; token_version: unknown };
       };
       expect(await verifyPassword('novaSenha456', data.password_hash)).toBe(
         true,
       );
+      // Invalida os tokens antigos: é preciso logar de novo
+      expect(data.token_version).toEqual({ increment: 1 });
     });
 
     it('lança BadRequest e não altera quando a senha atual está errada', async () => {

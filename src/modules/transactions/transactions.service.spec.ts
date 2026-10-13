@@ -54,7 +54,10 @@ describe('TransactionsService', () => {
 
   describe('deposit', () => {
     it('soma no saldo e cria um lançamento de entrada', async () => {
-      prisma.accounts.findFirst.mockResolvedValue({ id: 'acc-b' });
+      prisma.accounts.findFirst.mockResolvedValue({
+        id: 'acc-b',
+        users: { status: 'active' },
+      });
       tx.accounts.update.mockResolvedValue({ balance: D('200') });
       tx.transactions.create.mockResolvedValue(
         entry({
@@ -101,8 +104,52 @@ describe('TransactionsService', () => {
 
     function accounts(from: string, to: string) {
       prisma.accounts.findUnique.mockResolvedValue({ id: from });
-      prisma.accounts.findFirst.mockResolvedValue({ id: to });
+      prisma.accounts.findFirst.mockResolvedValue({
+        id: to,
+        users: { status: 'active' },
+      });
     }
+
+    it('encontra o destinatário pelo CPF', async () => {
+      accounts('acc-a', 'acc-b');
+      tx.accounts.update.mockResolvedValue({ balance: D('0') });
+      tx.transactions.create.mockResolvedValue(entry());
+
+      await service.transfer('user-a', { to_cpf: '52998224725', amount: 50 });
+
+      expect(prisma.accounts.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { users: { cpf: '52998224725' } },
+        }),
+      );
+    });
+
+    it.each([
+      ['nenhum dos dois', { amount: 50 }],
+      [
+        'os dois',
+        { to_email: 'fulano@email.com', to_cpf: '52998224725', amount: 50 },
+      ],
+    ])('exige to_email ou to_cpf (recusa %s)', async (_caso, body) => {
+      prisma.accounts.findUnique.mockResolvedValue({ id: 'acc-a' });
+
+      await expect(service.transfer('user-a', body)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('não transfere para conta desativada', async () => {
+      prisma.accounts.findUnique.mockResolvedValue({ id: 'acc-a' });
+      prisma.accounts.findFirst.mockResolvedValue({
+        id: 'acc-b',
+        users: { status: 'deactivated' },
+      });
+
+      await expect(service.transfer('user-a', dto)).rejects.toThrow(
+        'Conta de destino desativada',
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
 
     it('não permite transferir para a própria conta', async () => {
       accounts('acc-a', 'acc-a');

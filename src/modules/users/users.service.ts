@@ -18,7 +18,10 @@ const userSelect = {
   name: true,
   email: true,
   date_of_birth: true,
+  cpf: true,
+  phone: true,
   role: true,
+  status: true,
   created_at: true,
   updated_at: true,
 } satisfies Prisma.usersSelect;
@@ -36,6 +39,8 @@ export class UsersService {
           name: dto.name,
           email: dto.email.toLowerCase(),
           date_of_birth: new Date(dto.date_of_birth),
+          cpf: dto.cpf,
+          phone: dto.phone,
           password_hash: await hashPassword(dto.password),
           // Cria a conta (saldo 0) junto, no mesmo INSERT atômico
           accounts: { create: {} },
@@ -76,6 +81,7 @@ export class UsersService {
           date_of_birth: dto.date_of_birth
             ? new Date(dto.date_of_birth)
             : undefined,
+          phone: dto.phone,
           updated_at: new Date(),
         },
         select: userSelect,
@@ -103,6 +109,8 @@ export class UsersService {
       where: { id },
       data: {
         password_hash: await hashPassword(dto.new_password),
+        // Invalida todos os tokens: é preciso fazer login de novo com a nova senha
+        token_version: { increment: 1 },
         updated_at: new Date(),
       },
     });
@@ -128,7 +136,11 @@ function toUser(user: SelectedUser): User {
 function handlePrismaError(error: unknown): unknown {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === 'P2002') {
-      return new ConflictException('E-mail já cadastrado');
+      // O erro informa qual constraint UNIQUE foi violada
+      const field = JSON.stringify(error.meta ?? {}).includes('cpf')
+        ? 'CPF'
+        : 'E-mail';
+      return new ConflictException(`${field} já cadastrado`);
     }
     if (error.code === 'P2025') {
       return new NotFoundException('Usuário não encontrado');

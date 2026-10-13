@@ -65,6 +65,24 @@ Login com JWT: `POST /auth/login` recebe `email` e `password` e devolve um `acce
 - `GET`, `PATCH /users/:id` e `PATCH /users/:id/password` só funcionam no próprio usuário; caso contrário, 403.
 - No Swagger, clique em **Authorize** e cole o token.
 
+### Sessão
+
+Cada token carrega a versão (`ver`) dos tokens do usuário no momento do login; a versão atual fica em `users.token_version`. O guard compara as duas a cada requisição. Incrementam a versão (derrubando **todas** as sessões abertas):
+
+- trocar a senha (`PATCH /users/:id/password`);
+- `POST /auth/logout`;
+- ter a conta desativada.
+
+Nesses casos, e também com token expirado ou inválido, a API responde **401 "Sessão expirada. Faça login novamente."**. **No front: ao receber 401 em qualquer rota, apague o token e volte para a tela de login.** Login de conta desativada responde `403 Conta desativada`.
+
+### CORS
+
+Só os endereços listados em `CORS_ORIGINS` (no `.env`, separados por vírgula) podem chamar a API pelo navegador. Padrão de desenvolvimento: `http://localhost:5173` (Vite) e `http://localhost:8081` (Expo). Em produção, coloque o domínio do front.
+
+### Cadastro
+
+`POST /users` exige `name`, `email`, `date_of_birth`, `cpf`, `phone` e `password`. CPF e telefone aceitam pontuação e são salvos só com dígitos. O CPF é validado pelos dígitos verificadores, é único e **não pode ser alterado** depois.
+
 ### Perfis (roles)
 
 Cada usuário tem um `role`: `user` (padrão) ou `admin`. Para restringir uma rota, use `@Roles('admin')`. O `RolesGuard` lê o perfil **do banco** a cada requisição, então promover ou rebaixar alguém vale na hora, sem novo login.
@@ -75,7 +93,17 @@ Ninguém vira admin pela API (o campo `role` é recusado no cadastro e no update
 UPDATE users SET role = 'admin' WHERE email = 'fulano@email.com';
 ```
 
-Rotas exclusivas de admin: `GET /users` (listar todos), `DELETE /users/:id` (remover usuário) e `POST /transactions/deposit` (depósito).
+Rotas exclusivas de admin: `GET /users` (listar todos), `DELETE /users/:id` (remover usuário), `POST /transactions/deposit` (depósito) e a avaliação de desativações (`GET /deactivation-requests`, `PATCH .../approve`, `PATCH .../reject`).
+
+### Desativação de conta
+
+1. O usuário pede: `POST /deactivation-requests` (motivo opcional). Resposta `202` com a mensagem **"Sua solicitação foi recebida. O suporte avaliará a solicitação."** Só pode haver uma pendente por vez (`409`).
+2. O usuário acompanha em `GET /deactivation-requests/me` (`pending`, `approved` ou `rejected`).
+3. O admin vê a fila em `GET /deactivation-requests?status=pending` e decide:
+   - `PATCH /deactivation-requests/:id/approve`: **exige saldo zerado** (`409` caso contrário). A conta fica `deactivated`: as sessões caem, o login passa a responder `403`, ela não recebe transferências (`422`) e o histórico é mantido.
+   - `PATCH /deactivation-requests/:id/reject`: a conta continua ativa e o usuário pode pedir de novo.
+
+Cada decisão registra quem avaliou (`reviewed_by`), quando e a observação.
 
 ## Saldo e movimentações
 
@@ -86,7 +114,8 @@ users 1───1 accounts (balance) 1───N transactions
 - **Conta:** criada automaticamente no cadastro, com saldo 0. `GET /accounts/me` devolve o saldo.
 - **Movimentações** (`transactions`): cada linha é um lançamento em uma conta, com `type` (`entrada` | `saida`), `category` (`deposito` | `transferencia`), `amount` e `balance_after` (saldo logo após o lançamento).
   - `POST /transactions/deposit` (**somente admin**): dinheiro entrando de fora. Gera uma `entrada`.
-  - `POST /transactions/transfer`: do usuário logado para outro, pelo e-mail (`to_email`). Gera uma `saida` na origem e uma `entrada` no destino.
+  - `POST /transactions/transfer`: do usuário logado para outro, identificado por `to_email` **ou** `to_cpf` (nunca os dois). Gera uma `saida` na origem e uma `entrada` no destino.
+  - Depósito e transferência para conta desativada são recusados (`422`).
   - `GET /transactions` (extrato, com `limit`/`offset`) e `GET /transactions/:id`.
 - **Valores:** `NUMERIC(15,2)` no banco; na API, entram como número (máx. 2 casas, de 0,01 a 1.000.000 por operação) e saem como texto (`"200.00"`).
 
@@ -95,7 +124,7 @@ Garantias:
 - Saldo e lançamentos são gravados na mesma transação do banco: ou tudo é aplicado, ou nada.
 - O débito só acontece se houver saldo (`422 Saldo insuficiente`), e o banco tem `CHECK (balance >= 0)` como segunda barreira. Transferências simultâneas nunca deixam o saldo negativo.
 - As duas contas de uma transferência são travadas sempre na mesma ordem (por id), evitando deadlock.
-- Lançamentos são imutáveis (sem rotas de edição ou exclusão). Um usuário com movimentações não pode ser removido (`409`).
+- Lançamentos são imutáveis (sem rotas de edição ou exclusão). Um usuário com movimentações não pode ser removido (`409`); para encerrar a conta, use a desativação.
 - O saldo deve sempre bater com o extrato. Para conferir no banco:
 
 ```sql

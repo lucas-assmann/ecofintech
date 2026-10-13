@@ -1,5 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { user_role } from '../../../database/generated/prisma/enums.js';
+import {
+  user_role,
+  user_status,
+} from '../../../database/generated/prisma/enums.js';
 
 /** Usuário como devolvido pela API (sem a senha). */
 export class User {
@@ -14,6 +17,20 @@ export class User {
 
   /** @example "1995-08-20" */
   date_of_birth: string;
+
+  /** @example "52998224725" */
+  cpf: string;
+
+  /** @example "11987654321" */
+  phone: string;
+
+  @ApiProperty({
+    enum: user_status,
+    enumName: 'user_status',
+    description: 'Situação da conta',
+    example: user_status.active,
+  })
+  status: user_status;
 
   @ApiProperty({
     enum: user_role,

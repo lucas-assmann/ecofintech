@@ -7,14 +7,26 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { IsCpf, OnlyDigits } from '../../../common/validators/cpf.js';
 
+// Quem recebe é identificado por to_email OU to_cpf (exatamente um dos dois)
 export class TransferDto {
   /**
-   * E-mail de quem vai receber (funciona como uma chave Pix)
+   * E-mail de quem vai receber. Informe este ou `to_cpf`.
    * @example "fulano@email.com"
    */
+  @IsOptional()
   @IsEmail()
-  to_email: string;
+  to_email?: string;
+
+  /**
+   * CPF de quem vai receber, com ou sem pontuação. Informe este ou `to_email`.
+   * @example "529.982.247-25"
+   */
+  @IsOptional()
+  @OnlyDigits()
+  @IsCpf()
+  to_cpf?: string;
 
   /**
    * Valor em reais, com no máximo 2 casas decimais

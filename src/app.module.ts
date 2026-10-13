@@ -10,6 +10,7 @@ import { UsersModule } from './modules/users/users.module.js';
 import { AccountsModule } from './modules/accounts/accounts.module.js';
 import { TransactionsModule } from './modules/transactions/transactions.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { DeactivationRequestsModule } from './modules/deactivation-requests/deactivation-requests.module.js';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { AuthModule } from './modules/auth/auth.module.js';
     AccountsModule,
     TransactionsModule,
     AuthModule,
+    DeactivationRequestsModule,
   ],
   controllers: [AppController],
   providers: [

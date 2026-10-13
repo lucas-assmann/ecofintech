@@ -3,9 +3,11 @@ import {
   IsEmail,
   IsNotEmpty,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { IsCpf, OnlyDigits } from '../../../common/validators/cpf.js';
 
 export class CreateUserDto {
   /**
@@ -31,6 +33,24 @@ export class CreateUserDto {
    */
   @IsDateString({ strict: true })
   date_of_birth: string;
+
+  /**
+   * CPF, com ou sem pontuação (salvo só com dígitos). Não pode ser alterado depois.
+   * @example "529.982.247-25"
+   */
+  @OnlyDigits()
+  @IsCpf()
+  cpf: string;
+
+  /**
+   * Telefone com DDD, com ou sem pontuação (salvo só com dígitos)
+   * @example "(11) 98765-4321"
+   */
+  @OnlyDigits()
+  @Matches(/^\d{10,11}$/, {
+    message: 'phone deve ter DDD + número (10 ou 11 dígitos)',
+  })
+  phone: string;
 
   /**
    * Senha (mínimo 8 caracteres). Nunca é devolvida pela API.
