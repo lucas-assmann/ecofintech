@@ -62,6 +62,8 @@ Com a API rodando:
 - **Swagger UI:** http://localhost:3000/docs — lista todas as rotas, parâmetros e respostas, e permite testar.
 - **OpenAPI JSON:** http://localhost:3000/docs-json — use para importar no Postman (*Import → Link*) ou gerar clientes para o front.
 
+**Postman:** a collection com todas as requests, organizadas por pasta e com testes, fica em `docs/postman/ecofintech-api.postman_collection.json`. Importe no Postman (*Import* → arraste o arquivo). Rode **Users → Criar usuário** primeiro: ele salva o id na variável `user_id`, usada pelas outras requests. Ao criar ou alterar rotas, atualize esse arquivo.
+
 A documentação é gerada a partir do código: o plugin `@nestjs/swagger` (em `nest-cli.json`) lê os DTOs e os comentários JSDoc automaticamente. Para detalhar uma rota, use decorators como `@ApiTags`, `@ApiOperation` e `@ApiOkResponse` (veja `src/app.controller.ts`).
 
 ## Testes e qualidade

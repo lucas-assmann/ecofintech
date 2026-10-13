@@ -1,0 +1,265 @@
+{
+  "info": {
+    "name": "Ecofintech API",
+    "description": "Requests da API da Ecofintech.\n\nVariáveis da collection:\n- `base_url`: endereço da API (padrão http://localhost:3000)\n- `user_id`: preenchida automaticamente ao rodar **Criar usuário**",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000", "type": "string" },
+    { "key": "user_id", "value": "", "type": "string" },
+    { "key": "account_id", "value": "1", "type": "string" },
+    { "key": "transaction_id", "value": "1", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Verificar API",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/",
+            "description": "Verifica se a API está no ar."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Criar usuário",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/users",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Maria Silva\",\n  \"email\": \"maria@email.com\",\n  \"date_of_birth\": \"1995-08-20\",\n  \"password\": \"senhaForte123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Cadastra um usuário. Salva o `id` retornado na variável `user_id`.\n\nErros: 400 (dados inválidos), 409 (e-mail já cadastrado)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "",
+                  "const user = pm.response.json();",
+                  "pm.test('Não devolve a senha', () => {",
+                  "  pm.expect(user).to.not.have.property('password');",
+                  "  pm.expect(user).to.not.have.property('password_hash');",
+                  "});",
+                  "",
+                  "if (user.id) pm.collectionVariables.set('user_id', user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar usuários",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/users",
+            "description": "Lista todos os usuários, do mais recente para o mais antigo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Retorna uma lista', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar usuário",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/users/{{user_id}}",
+            "description": "Busca um usuário pelo id.\n\nErros: 400 (id não é UUID), 404 (não encontrado)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Atualizar usuário",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/users/{{user_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Maria S. Souza\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Atualiza só os campos enviados (`name`, `email`, `date_of_birth`, `password`).\n\nErros: 400, 404, 409."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remover usuário",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/users/{{user_id}}",
+            "description": "Remove um usuário.\n\nErros: 400, 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Accounts",
+      "description": "Rotas ainda são o esqueleto gerado pela CLI (sem banco).",
+      "item": [
+        {
+          "name": "Criar conta",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Listar contas",
+          "request": { "method": "GET", "url": "{{base_url}}/accounts" }
+        },
+        {
+          "name": "Buscar conta",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/accounts/{{account_id}}"
+          }
+        },
+        {
+          "name": "Atualizar conta",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/accounts/{{account_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Remover conta",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/accounts/{{account_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "description": "Rotas ainda são o esqueleto gerado pela CLI (sem banco).",
+      "item": [
+        {
+          "name": "Criar transação",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/transactions",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Listar transações",
+          "request": { "method": "GET", "url": "{{base_url}}/transactions" }
+        },
+        {
+          "name": "Buscar transação",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/transactions/{{transaction_id}}"
+          }
+        },
+        {
+          "name": "Atualizar transação",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/transactions/{{transaction_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Remover transação",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/transactions/{{transaction_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Ainda sem rotas. Login e cadastro entram aqui.",
+      "item": []
+    }
+  ]
+}
