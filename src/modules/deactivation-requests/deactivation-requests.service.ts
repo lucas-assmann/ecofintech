@@ -105,7 +105,7 @@ export class DeactivationRequestsService {
       });
       if (account && account.balance.gt(0)) {
         throw new ConflictException(
-          `A conta ainda tem saldo de R$ ${account.balance.toFixed(2)}. ` +
+          `A conta ainda tem saldo de ${formatBRL(account.balance)}. ` +
             'O saldo precisa ser zerado antes da desativação.',
         );
       }
@@ -183,4 +183,12 @@ export class DeactivationRequestsService {
 function toRequest(request: SelectedRequest): DeactivationRequest {
   const { users_deactivation_requests_user_idTousers: user, ...rest } = request;
   return { ...rest, user };
+}
+
+// Valor em reais no padrão brasileiro para mensagens (ex.: "R$ 1.234,56").
+// O Intl usa espaço não separável depois de "R$"; trocamos por espaço comum.
+function formatBRL(value: Prisma.Decimal): string {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+    .format(value.toNumber())
+    .replace(/\s/g, ' ');
 }

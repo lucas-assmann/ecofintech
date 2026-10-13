@@ -127,7 +127,7 @@ describe('DeactivationRequestsService', () => {
       });
 
       await expect(service.approve('admin-1', 'req-1', {})).rejects.toThrow(
-        'A conta ainda tem saldo de R$ 150.00',
+        'A conta ainda tem saldo de R$ 150,00',
       );
       expect(tx.users.update).not.toHaveBeenCalled();
     });
