@@ -36,7 +36,9 @@ Primeira vez:
 1. Crie uma migration SQL nova em `src/database/migrations/`, numerada em sequência (ex.: `003_create_accounts.sql`). Nunca edite uma que já rodou.
 2. `npm run db:migrate` aplica as pendentes (as já aplicadas ficam em `schema_migrations`).
 3. `npm run db:pull` lê o banco, atualiza `src/database/schema.prisma` e regenera os tipos.
-4. No `schema.prisma`, dê nomes camelCase aos models e campos novos com `@@map`/`@map` (ex.: `model Account { ... @@map("accounts") }`). O `db pull` mantém esses nomes nas próximas vezes.
+### Padrão de nomes
+
+Os **nomes do banco são o padrão** em todo o projeto: tabelas e colunas em snake_case (`users`, `date_of_birth`) e os mesmos nomes no Prisma (`prisma.users`), nos DTOs e no JSON da API. Não use `@map`/`@@map` para renomear.
 
 > Não use `prisma migrate` nem edite colunas pelo `schema.prisma`: a fonte da verdade são as migrations SQL.
 
@@ -48,7 +50,7 @@ Injete o `PrismaService` (`src/database/prisma.service.ts`) em qualquer service:
 constructor(private readonly prisma: PrismaService) {}
 
 findByEmail(email: string) {
-  return this.prisma.user.findUnique({ where: { email } });
+  return this.prisma.users.findUnique({ where: { email } });
 }
 ```
 

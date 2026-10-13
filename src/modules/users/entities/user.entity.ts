@@ -10,9 +10,9 @@ export class User {
   email: string;
 
   /** @example "1995-08-20" */
-  dateOfBirth: string;
+  date_of_birth: string;
 
-  createdAt: Date;
+  created_at: Date;
 
-  updatedAt: Date;
+  updated_at: Date;
 }

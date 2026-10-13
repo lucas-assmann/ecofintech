@@ -30,7 +30,7 @@ export class CreateUserDto {
    * @example "1995-08-20"
    */
   @IsDateString({ strict: true })
-  dateOfBirth: string;
+  date_of_birth: string;
 
   /**
    * Senha (mínimo 8 caracteres). Nunca é devolvida pela API.
