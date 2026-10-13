@@ -390,6 +390,37 @@
       "name": "Accounts",
       "item": [
         {
+          "name": "Minhas contas",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/accounts",
+            "description": "Contas que o usuário pode usar: a pessoal primeiro, depois as empresas das quais é dono ou membro (por nome). O `id` de cada uma é o valor do cabeçalho `X-Account-Id` para operar com ela."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Primeira é a conta pessoal', () => pm.expect(pm.response.json()[0].kind).to.eql('personal'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Meu saldo",
           "request": {
             "method": "GET",
