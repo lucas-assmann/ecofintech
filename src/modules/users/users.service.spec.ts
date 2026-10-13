@@ -30,10 +30,16 @@ describe('UsersService', () => {
       update: vi.fn(),
       delete: vi.fn(),
     },
+    audit_logs: { create: vi.fn() },
+    $transaction: vi.fn(),
   };
 
   beforeEach(async () => {
     vi.resetAllMocks();
+    // Simula o $transaction do Prisma: executa o callback com o próprio mock
+    prisma.$transaction.mockImplementation(
+      (fn: (client: typeof prisma) => unknown) => fn(prisma),
+    );
     const module: TestingModule = await Test.createTestingModule({
       providers: [UsersService, { provide: PrismaService, useValue: prisma }],
     }).compile();
@@ -97,10 +103,44 @@ describe('UsersService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('remove lança NotFound quando o usuário não existe', async () => {
-    prisma.users.delete.mockRejectedValue(prismaError('P2025'));
+  describe('remove', () => {
+    it('remove e registra no audit_logs quem removeu e quem era', async () => {
+      const removed = {
+        name: 'Maria',
+        email: 'maria@email.com',
+        cpf: '52998224725',
+      };
+      prisma.users.delete.mockResolvedValue(removed);
 
-    await expect(service.remove('1')).rejects.toBeInstanceOf(NotFoundException);
+      await service.remove('admin-1', 'user-1');
+
+      expect(prisma.audit_logs.create).toHaveBeenCalledWith({
+        data: {
+          actor_id: 'admin-1',
+          action: 'user.delete',
+          target_type: 'user',
+          target_id: 'user-1',
+          details: removed,
+        },
+      });
+    });
+
+    it('lança NotFound quando o usuário não existe', async () => {
+      prisma.users.delete.mockRejectedValue(prismaError('P2025'));
+
+      await expect(service.remove('admin-1', '1')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.audit_logs.create).not.toHaveBeenCalled();
+    });
+
+    it('lança Conflict quando há movimentações ou operações registradas', async () => {
+      prisma.users.delete.mockRejectedValue(prismaError('P2003'));
+
+      await expect(service.remove('admin-1', '1')).rejects.toThrow(
+        'movimentações ou operações registradas',
+      );
+    });
   });
 
   describe('updatePassword', () => {

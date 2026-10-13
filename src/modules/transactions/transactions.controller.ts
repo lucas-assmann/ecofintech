@@ -6,10 +6,12 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBadRequestResponse,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
@@ -18,16 +20,26 @@ import {
   ApiTags,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import {
+  ApiIdempotencyKey,
+  IdempotencyKey,
+} from '../../common/decorators/idempotency-key.decorator.js';
 import type { JwtPayload } from '../../common/guards/auth.guard.js';
-import { TransactionsService } from './transactions.service.js';
+import {
+  OperationResult,
+  TransactionsService,
+} from './transactions.service.js';
 import { DepositDto } from './dto/deposit.dto.js';
 import { TransferDto } from './dto/transfer.dto.js';
+import { ReverseTransactionDto } from './dto/reverse-transaction.dto.js';
 import { ListTransactionsQueryDto } from './dto/list-transactions.query.dto.js';
 import { Transaction } from './entities/transaction.entity.js';
 
 // Movimentações são imutáveis: não há rotas para editar nem apagar.
+// Correções são feitas por estorno.
 @ApiTags('Transactions')
 @ApiBearerAuth()
 @Controller('transactions')
@@ -36,31 +48,84 @@ export class TransactionsController {
 
   @Post('deposit')
   @Roles('admin')
+  @ApiIdempotencyKey()
   @ApiOperation({
     summary: 'Deposita na conta de um usuário (somente admin)',
   })
   @ApiCreatedResponse({ type: Transaction })
+  @ApiBadRequestResponse({ description: 'Dados ou Idempotency-Key inválidos' })
   @ApiForbiddenResponse({ description: 'Usuário não é admin' })
   @ApiNotFoundResponse({ description: 'Destinatário não encontrado' })
-  deposit(@Body() depositDto: DepositDto) {
-    return this.transactionsService.deposit(depositDto);
+  @ApiUnprocessableEntityResponse({
+    description:
+      'Conta de destino desativada ou Idempotency-Key reutilizada com outros dados',
+  })
+  async deposit(
+    @CurrentUser() admin: JwtPayload,
+    @IdempotencyKey() key: string,
+    @Body() depositDto: DepositDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return withReplayHeader(
+      res,
+      await this.transactionsService.deposit(admin.sub, key, depositDto),
+    );
   }
 
   @Post('transfer')
+  @ApiIdempotencyKey()
   @ApiOperation({
-    summary: 'Transfere do usuário logado para outro usuário (pelo e-mail)',
+    summary:
+      'Transfere do usuário logado para outro usuário (por e-mail ou CPF)',
   })
   @ApiCreatedResponse({
     type: Transaction,
     description: 'Lançamento de saída na conta de quem enviou',
   })
   @ApiBadRequestResponse({
-    description: 'Dados inválidos ou transferência para a própria conta',
+    description:
+      'Dados inválidos, transferência para a própria conta ou Idempotency-Key ausente',
   })
   @ApiNotFoundResponse({ description: 'Destinatário não encontrado' })
-  @ApiUnprocessableEntityResponse({ description: 'Saldo insuficiente' })
-  transfer(@CurrentUser() user: JwtPayload, @Body() transferDto: TransferDto) {
-    return this.transactionsService.transfer(user.sub, transferDto);
+  @ApiUnprocessableEntityResponse({
+    description:
+      'Saldo insuficiente, conta de destino desativada ou Idempotency-Key reutilizada com outros dados',
+  })
+  async transfer(
+    @CurrentUser() user: JwtPayload,
+    @IdempotencyKey() key: string,
+    @Body() transferDto: TransferDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return withReplayHeader(
+      res,
+      await this.transactionsService.transfer(user.sub, key, transferDto),
+    );
+  }
+
+  @Post(':id/reverse')
+  @Roles('admin')
+  @ApiOperation({
+    summary:
+      'Estorna um lançamento (somente admin). Em transferências, desfaz as duas pontas',
+  })
+  @ApiCreatedResponse({
+    type: [Transaction],
+    description: 'Lançamentos de estorno criados',
+  })
+  @ApiForbiddenResponse({ description: 'Usuário não é admin' })
+  @ApiNotFoundResponse({ description: 'Movimentação não encontrada' })
+  @ApiConflictResponse({ description: 'Movimentação já estornada' })
+  @ApiUnprocessableEntityResponse({
+    description:
+      'Saldo insuficiente para o estorno, conta desativada ou tentativa de estornar um estorno',
+  })
+  reverse(
+    @CurrentUser() admin: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReverseTransactionDto,
+  ) {
+    return this.transactionsService.reverse(admin.sub, id, dto);
   }
 
   @Get()
@@ -76,7 +141,10 @@ export class TransactionsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Detalhe de um lançamento do usuário logado' })
+  @ApiOperation({
+    summary:
+      'Detalhe de um lançamento (usuário: só da própria conta; admin: qualquer um)',
+  })
   @ApiOkResponse({ type: Transaction })
   @ApiNotFoundResponse({ description: 'Movimentação não encontrada' })
   findOne(
@@ -85,4 +153,10 @@ export class TransactionsController {
   ) {
     return this.transactionsService.findOne(user.sub, id);
   }
+}
+
+// Em uma repetição (mesma Idempotency-Key), avisa o cliente pelo header
+function withReplayHeader(res: Response, result: OperationResult) {
+  if (result.replayed) res.setHeader('Idempotent-Replayed', 'true');
+  return result.transaction;
 }

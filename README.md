@@ -31,6 +31,8 @@ Primeira vez:
 3. `npm run db:migrate` para criar as tabelas.
 4. `npm run db:pull` para gerar o client do Prisma.
 
+A API valida o `.env` ao iniciar (`src/config/env.validation.ts`): se faltar uma variável ou ela estiver errada (ex.: `JWT_SECRET` com menos de 32 caracteres), ela não sobe e lista o que corrigir.
+
 ### Fluxo para mudar o banco
 
 1. Crie uma migration SQL nova em `src/database/migrations/`, numerada em sequência (ex.: `003_create_accounts.sql`). Nunca edite uma que já rodou.
@@ -116,6 +118,7 @@ users 1───1 accounts (balance) 1───N transactions
   - `POST /transactions/deposit` (**somente admin**): dinheiro entrando de fora. Gera uma `entrada`.
   - `POST /transactions/transfer`: do usuário logado para outro, identificado por `to_email` **ou** `to_cpf` (nunca os dois). Gera uma `saida` na origem e uma `entrada` no destino.
   - Depósito e transferência para conta desativada são recusados (`422`).
+  - `POST /transactions/:id/reverse` (**somente admin**): estorno. Lança o movimento inverso com `category: "estorno"` e `reversal_of` apontando para o original. Estornar qualquer ponta de uma transferência desfaz as duas. Cada lançamento só pode ser estornado uma vez (`409`), estorno não se estorna (`422`) e é preciso saldo na conta que devolve (`422`).
   - `GET /transactions` (extrato, com `limit`/`offset`) e `GET /transactions/:id`.
 - **Valores:** `NUMERIC(15,2)` no banco; na API, entram como número (máx. 2 casas, de 0,01 a 1.000.000 por operação) e saem como texto (`"200.00"`).
 
@@ -124,6 +127,8 @@ Garantias:
 - Saldo e lançamentos são gravados na mesma transação do banco: ou tudo é aplicado, ou nada.
 - O débito só acontece se houver saldo (`422 Saldo insuficiente`), e o banco tem `CHECK (balance >= 0)` como segunda barreira. Transferências simultâneas nunca deixam o saldo negativo.
 - As duas contas de uma transferência são travadas sempre na mesma ordem (por id), evitando deadlock.
+- **Idempotência:** depósito e transferência exigem o header `Idempotency-Key` (UUID). O front gera um UUID novo por operação e, se precisar reenviar (ex.: a resposta não chegou), manda **a mesma chave**: a API devolve o lançamento original com o header `Idempotent-Replayed: true`, sem mover o dinheiro de novo. A mesma chave com dados diferentes é recusada (`422`). Uma operação que falhou não consome a chave.
+- **Auditoria:** cada lançamento guarda quem o executou (`created_by`: o admin no depósito e no estorno, o remetente na transferência) e um `operation_id` comum às pontas da mesma operação. Remoções de usuário ficam em `audit_logs` (quem removeu e os dados do removido). Quem tem operações registradas não pode ser removido; use a desativação.
 - Lançamentos são imutáveis (sem rotas de edição ou exclusão). Um usuário com movimentações não pode ser removido (`409`); para encerrar a conta, use a desativação.
 - O saldo deve sempre bater com o extrato. Para conferir no banco:
 

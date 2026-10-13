@@ -32,8 +32,11 @@ model users {
   deactivated_at                                                 DateTime?               @db.Timestamptz(6)
   token_version                                                  Int                     @default(0)
   accounts                                                       accounts?
+  audit_logs                                                     audit_logs[]
   deactivation_requests_deactivation_requests_reviewed_byTousers deactivation_requests[] @relation("deactivation_requests_reviewed_byTousers")
   deactivation_requests_deactivation_requests_user_idTousers     deactivation_requests?  @relation("deactivation_requests_user_idTousers")
+  idempotency_keys                                               idempotency_keys[]
+  transactions                                                   transactions[]
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -59,10 +62,18 @@ model transactions {
   counterparty_account_id                                 String?              @db.Uuid
   description                                             String?
   created_at                                              DateTime             @default(now()) @db.Timestamptz(6)
+  created_by                                              String               @db.Uuid
+  operation_id                                            String               @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reversal_of                                             String?              @unique(map: "transactions_reversal_of_unique", where: raw("(reversal_of IS NOT NULL)")) @db.Uuid
+  idempotency_keys                                        idempotency_keys[]
   accounts_transactions_account_idToaccounts              accounts             @relation("transactions_account_idToaccounts", fields: [account_id], references: [id], onUpdate: NoAction)
   accounts_transactions_counterparty_account_idToaccounts accounts?            @relation("transactions_counterparty_account_idToaccounts", fields: [counterparty_account_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users                                                   users                @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  transactions                                            transactions?        @relation("transactionsTotransactions", fields: [reversal_of], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  other_transactions                                      transactions?        @relation("transactionsTotransactions")
 
   @@index([account_id, created_at(sort: Desc)])
+  @@index([operation_id])
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -79,6 +90,32 @@ model deactivation_requests {
   users_deactivation_requests_user_idTousers     users                       @relation("deactivation_requests_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
+model audit_logs {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actor_id    String?  @db.Uuid
+  action      String
+  target_type String
+  target_id   String   @db.Uuid
+  details     Json?
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  users       users?   @relation(fields: [actor_id], references: [id], onUpdate: NoAction)
+
+  @@index([target_type, target_id], map: "audit_logs_target_idx")
+}
+
+model idempotency_keys {
+  user_id        String        @db.Uuid
+  key            String        @db.Uuid
+  endpoint       String
+  request_hash   String
+  transaction_id String?       @db.Uuid
+  created_at     DateTime      @default(now()) @db.Timestamptz(6)
+  transactions   transactions? @relation(fields: [transaction_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users          users         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([user_id, key])
+}
+
 enum user_role {
   user
   admin
@@ -87,6 +124,7 @@ enum user_role {
 enum transaction_category {
   deposito
   transferencia
+  estorno
 }
 
 enum transaction_type {

@@ -76,6 +76,16 @@
       "type": "string"
     },
     {
+      "key": "deposit_key",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transfer_key",
+      "value": "",
+      "type": "string"
+    },
+    {
       "key": "deactivation_request_id",
       "value": "",
       "type": "string"
@@ -315,7 +325,7 @@
     },
     {
       "name": "Transactions",
-      "description": "Movimentações são imutáveis: não há rotas para editar nem apagar.",
+      "description": "Movimentações são imutáveis: correções são feitas por estorno (admin).\n\n**Depósito e transferência exigem o header `Idempotency-Key`** (um UUID novo por operação). Reenviar a mesma chave com os mesmos dados devolve o lançamento original, com o header `Idempotent-Replayed: true`, sem mover o dinheiro de novo. As requests geram a chave automaticamente.",
       "item": [
         {
           "name": "Depositar (admin)",
@@ -335,6 +345,10 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{deposit_key}}"
               }
             ],
             "url": "{{base_url}}/transactions/deposit",
@@ -347,7 +361,7 @@
                 }
               }
             },
-            "description": "Deposita na conta de um usuário, identificado por `to_email` ou `to_cpf`. **Somente admin.**\n\nPulada se `admin_token` estiver vazio.\n\nErros: 400, 401, 403 (não é admin), 404 (destinatário não encontrado), 422 (conta de destino desativada)."
+            "description": "Deposita na conta de um usuário, identificado por `to_email` ou `to_cpf`. **Somente admin.** O lançamento registra qual admin fez o depósito.\n\nPulada se `admin_token` estiver vazio.\n\nErros: 400 (dados ou Idempotency-Key inválidos), 401, 403 (não é admin), 404 (destinatário não encontrado), 422 (conta desativada ou chave reutilizada com outros dados)."
           },
           "event": [
             {
@@ -356,6 +370,15 @@
                 "type": "text/javascript",
                 "exec": [
                   "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('deposit_key', pm.variables.replaceIn('{{$guid}}'));"
                 ]
               }
             },
@@ -379,6 +402,10 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{transfer_key}}"
               }
             ],
             "url": "{{base_url}}/transactions/transfer",
@@ -391,7 +418,7 @@
                 }
               }
             },
-            "description": "Transfere do usuário logado para outro, pelo e-mail. Gera saída na origem e entrada no destino; a resposta é o lançamento de saída.\n\nNo fluxo da collection, envia 30 para o admin. Pulada se `admin_email` estiver vazio.\n\nErros: 400 (dados inválidos, para a própria conta, ou e-mail e CPF juntos), 401, 404 (destinatário não encontrado), 422 (saldo insuficiente ou conta de destino desativada)."
+            "description": "Transfere do usuário logado para outro, pelo e-mail. Gera saída na origem e entrada no destino; a resposta é o lançamento de saída.\n\nNo fluxo da collection, envia 30 para o admin. Pulada se `admin_email` estiver vazio.\n\nErros: 400 (dados inválidos, para a própria conta, e-mail e CPF juntos ou Idempotency-Key ausente), 401, 404 (destinatário não encontrado), 422 (saldo insuficiente, conta de destino desativada ou chave reutilizada com outros dados)."
           },
           "event": [
             {
@@ -400,6 +427,15 @@
                 "type": "text/javascript",
                 "exec": [
                   "if (!pm.variables.get('admin_email')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('transfer_key', pm.variables.replaceIn('{{$guid}}'));"
                 ]
               }
             },
@@ -418,6 +454,55 @@
           ]
         },
         {
+          "name": "Repetir transferência (mesma chave)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{transfer_key}}"
+              }
+            ],
+            "url": "{{base_url}}/transactions/transfer",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to_email\": \"{{admin_email}}\",\n  \"amount\": 30,\n  \"description\": \"Pagamento\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Reenvia **a mesma transferência com a mesma `Idempotency-Key`**, como faria um app que perdeu a resposta. A API devolve o lançamento original com `Idempotent-Replayed: true` e **não transfere de novo**.\n\nPulada se `admin_email` estiver vazio."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_email')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Header Idempotent-Replayed', () => pm.expect(pm.response.headers.get('Idempotent-Replayed')).to.eql('true'));",
+                  "pm.test('Mesmo lançamento da primeira vez', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('transaction_id')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Transferir por CPF",
           "request": {
             "method": "POST",
@@ -425,6 +510,10 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
               }
             ],
             "url": "{{base_url}}/transactions/transfer",
@@ -461,6 +550,61 @@
           ]
         },
         {
+          "name": "Estornar (admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/transactions/{{transaction_id}}/reverse",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Transferência contestada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Estorna um lançamento. **Somente admin.** Em transferências, desfaz as duas pontas (devolve para quem enviou e retira de quem recebeu). Cada lançamento só pode ser estornado uma vez, e estorno não se estorna.\n\nNo fluxo da collection, estorna a \"Transferir por e-mail\" (30).\n\nErros: 401, 403, 404, 409 (já estornada), 422 (saldo insuficiente para o estorno, conta desativada ou tentativa de estornar um estorno)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const entries = pm.response.json();",
+                  "pm.test('Dois lançamentos de estorno', () => pm.expect(entries.map((e) => e.category)).to.eql(['estorno', 'estorno']));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Extrato",
           "request": {
             "method": "GET",
@@ -485,7 +629,7 @@
                 }
               ]
             },
-            "description": "Extrato do usuário logado, do mais recente para o mais antigo."
+            "description": "Extrato do usuário logado, do mais recente para o mais antigo. Estornos aparecem com `category: \"estorno\"` e `reversal_of` apontando para o lançamento estornado."
           },
           "event": [
             {
@@ -505,7 +649,7 @@
           "request": {
             "method": "GET",
             "url": "{{base_url}}/transactions/{{transaction_id}}",
-            "description": "Detalhe de um lançamento do usuário logado (usa o `transaction_id` salvo pelo Transferir).\n\nErros: 400 (id não é UUID), 401, 404 (não existe ou é de outra conta)."
+            "description": "Detalhe de um lançamento: o usuário vê só os da própria conta; o admin vê qualquer um.\n\nErros: 400 (id não é UUID), 401, 404 (não existe ou é de outra conta)."
           },
           "event": [
             {

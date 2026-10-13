@@ -48,5 +48,8 @@ export class Transaction {
   /** @example "Aluguel" */
   description: string | null;
 
+  /** Em estornos: id do lançamento que foi estornado (null nos demais) */
+  reversal_of: string | null;
+
   created_at: Date;
 }

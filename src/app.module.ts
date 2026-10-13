@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { validateEnv } from './config/env.validation.js';
 import { AuthGuard } from './common/guards/auth.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
 import { AppController } from './app.controller.js';
@@ -14,7 +15,8 @@ import { DeactivationRequestsModule } from './modules/deactivation-requests/deac
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    // validate: a API não sobe se o .env estiver incompleto ou inválido
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     DatabaseModule,
     UsersModule,
     AccountsModule,

@@ -113,10 +113,13 @@ export class UsersController {
   @ApiNotFoundResponse({ description: 'Usuário não encontrado' })
   @ApiForbiddenResponse({ description: 'Usuário não é admin' })
   @ApiConflictResponse({
-    description: 'Usuário possui movimentações financeiras',
+    description: 'Usuário possui movimentações ou operações registradas',
   })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.remove(id);
+  remove(
+    @CurrentUser() admin: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.usersService.remove(admin.sub, id);
   }
 }
 

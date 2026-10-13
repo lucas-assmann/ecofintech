@@ -116,9 +116,25 @@ export class UsersService {
     });
   }
 
-  async remove(id: string): Promise<void> {
+  /** Remove o usuário e registra no audit_logs quem removeu e quem era. */
+  async remove(actor_id: string, id: string): Promise<void> {
     try {
-      await this.prisma.users.delete({ where: { id } });
+      await this.prisma.$transaction(async (tx) => {
+        // delete devolve a linha apagada: os dados vão para o registro de auditoria
+        const removed = await tx.users.delete({
+          where: { id },
+          select: { name: true, email: true, cpf: true },
+        });
+        await tx.audit_logs.create({
+          data: {
+            actor_id,
+            action: 'user.delete',
+            target_type: 'user',
+            target_id: id,
+            details: removed,
+          },
+        });
+      });
     } catch (error) {
       throw handlePrismaError(error);
     }
@@ -145,10 +161,11 @@ function handlePrismaError(error: unknown): unknown {
     if (error.code === 'P2025') {
       return new NotFoundException('Usuário não encontrado');
     }
-    // Chave estrangeira: a conta tem movimentações (ON DELETE RESTRICT)
+    // Chave estrangeira (ON DELETE RESTRICT): a conta tem movimentações ou o
+    // usuário executou operações registradas (ex.: admin que fez depósitos)
     if (error.code === 'P2003') {
       return new ConflictException(
-        'Usuário possui movimentações financeiras e não pode ser removido',
+        'Usuário possui movimentações ou operações registradas e não pode ser removido. Use a desativação.',
       );
     }
   }
