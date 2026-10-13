@@ -1,11 +1,11 @@
-// Aplica, em ordem, os arquivos .sql de db/migrations que ainda não rodaram.
+// Aplica, em ordem, os arquivos .sql de ./migrations que ainda não rodaram.
 // Os já aplicados ficam registrados na tabela schema_migrations.
 // Uso: npm run db:migrate
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import pg from 'pg';
 
-const migrationsDir = path.join(import.meta.dirname, '..', 'db', 'migrations');
+const migrationsDir = path.join(import.meta.dirname, 'migrations');
 
 const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
 await client.connect();

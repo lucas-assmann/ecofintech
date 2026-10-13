@@ -20,7 +20,7 @@
     "test:cov": "vitest run --coverage",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
-    "db:migrate": "node --env-file=.env scripts/migrate.ts"
+    "db:migrate": "node --env-file=.env src/database/migrate.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

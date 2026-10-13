@@ -28,7 +28,7 @@ PostgreSQL acessado com **SQL puro** via [`pg`](https://node-postgres.com/) (sem
 2. Configure `DATABASE_URL` no `.env`.
 3. Rode as migrations: `npm run db:migrate`.
 
-**Migrations** ficam em `db/migrations/` como arquivos `.sql` numerados (`001_...`, `002_...`) e são aplicadas em ordem. As já aplicadas ficam registradas na tabela `schema_migrations`. Nunca edite uma migration que já rodou; crie uma nova.
+**Migrations** ficam em `src/database/migrations/` como arquivos `.sql` numerados (`001_...`, `002_...`) e são aplicadas em ordem. As já aplicadas ficam registradas na tabela `schema_migrations`. Nunca edite uma migration que já rodou; crie uma nova.
 
 **No código**, injete o `DatabaseService` (`src/database/database.service.ts`) em qualquer service:
 
@@ -72,6 +72,8 @@ src/
 │   └── users/
 ├── common/            # guards, filters, interceptors, utils
 ├── config/            # configuração e variáveis de ambiente
+├── database/          # conexão, migrations (.sql) e script de migrate
+│   └── migrations/
 ├── app.module.ts
 └── main.ts
 test/                  # testes e2e
