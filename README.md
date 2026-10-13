@@ -20,6 +20,28 @@ npm run start:prod     # roda o build
 
 A API sobe em `http://localhost:3000`.
 
+## Banco de dados
+
+PostgreSQL acessado com **SQL puro** via [`pg`](https://node-postgres.com/) (sem ORM).
+
+1. Crie o banco: `CREATE DATABASE ecofintech;` (pelo pgAdmin ou `psql`).
+2. Configure `DATABASE_URL` no `.env`.
+3. Rode as migrations: `npm run db:migrate`.
+
+**Migrations** ficam em `db/migrations/` como arquivos `.sql` numerados (`001_...`, `002_...`) e são aplicadas em ordem. As já aplicadas ficam registradas na tabela `schema_migrations`. Nunca edite uma migration que já rodou; crie uma nova.
+
+**No código**, injete o `DatabaseService` (`src/database/database.service.ts`) em qualquer service:
+
+```ts
+constructor(private readonly db: DatabaseService) {}
+
+findByEmail(email: string) {
+  return this.db.query<User>('SELECT * FROM users WHERE email = $1', [email]);
+}
+```
+
+Use sempre parâmetros (`$1`, `$2`...) em vez de concatenar valores na string, para evitar SQL injection. Para operações que precisam ser atômicas (ex.: transferência), use `db.transaction(...)`.
+
 ## Documentação da API
 
 Com a API rodando:
