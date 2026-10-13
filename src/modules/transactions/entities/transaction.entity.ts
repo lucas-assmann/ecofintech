@@ -53,3 +53,9 @@ export class Transaction {
 
   created_at: Date;
 }
+
+/** Lançamento na listagem geral do admin: inclui o dono da conta. */
+export class AdminTransaction extends Transaction {
+  /** Dono da conta em que o lançamento foi feito */
+  owner: Counterparty;
+}

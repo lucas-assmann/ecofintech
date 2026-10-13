@@ -36,7 +36,11 @@ import { DepositDto } from './dto/deposit.dto.js';
 import { TransferDto } from './dto/transfer.dto.js';
 import { ReverseTransactionDto } from './dto/reverse-transaction.dto.js';
 import { ListTransactionsQueryDto } from './dto/list-transactions.query.dto.js';
-import { Transaction } from './entities/transaction.entity.js';
+import { ListAllTransactionsQueryDto } from './dto/list-all-transactions.query.dto.js';
+import {
+  AdminTransaction,
+  Transaction,
+} from './entities/transaction.entity.js';
 
 // Movimentações são imutáveis: não há rotas para editar nem apagar.
 // Correções são feitas por estorno.
@@ -138,6 +142,20 @@ export class TransactionsController {
     @Query() query: ListTransactionsQueryDto,
   ) {
     return this.transactionsService.findAll(user.sub, query);
+  }
+
+  // Precisa vir antes de GET :id, senão "all" seria lido como um id
+  @Get('all')
+  @Roles('admin')
+  @ApiOperation({
+    summary:
+      'Todos os lançamentos do sistema, com filtros (somente admin, mais recentes primeiro)',
+  })
+  @ApiOkResponse({ type: [AdminTransaction] })
+  @ApiBadRequestResponse({ description: 'Filtro inválido' })
+  @ApiForbiddenResponse({ description: 'Usuário não é admin' })
+  findAllAdmin(@Query() query: ListAllTransactionsQueryDto) {
+    return this.transactionsService.findAllAdmin(query);
   }
 
   @Get(':id')

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ecofintech API",
-    "description": "Requests da API da Ecofintech.\n\n**Fluxo (Run collection):** Health → Auth → Accounts → Transactions → Deactivation requests → Users → Encerrar sessão. O usuário de teste é cadastrado com CPF gerado automaticamente.\n\n**Recursos de admin** (depósito, listar/remover usuários, avaliar desativações): preencha `admin_email` e `admin_password` com um usuário admin (`UPDATE users SET role = 'admin' WHERE email = '...';`). Sem isso, essas requests são puladas.\n\n**Sessão:** trocar a senha, fazer logout ou ter a conta desativada invalida o token; a API responde 401 \"Sessão expirada. Faça login novamente.\" e o front deve voltar para o login.\n\nVariáveis preenchidas automaticamente: `user_id`, `user_email`, `user_cpf`, `token`, `admin_token`, `admin_cpf`, `transaction_id`, `deactivation_request_id`.",
+    "description": "Requests da API da Ecofintech.\n\n**Fluxo (Run collection):** Health → Auth → Accounts → Transactions → Deactivation requests → Users → Encerrar sessão. O usuário de teste é cadastrado com CPF gerado automaticamente.\n\n**Recursos de admin** (depósito, estorno, listar lançamentos, listar/remover usuários, avaliar desativações): preencha `admin_email` e `admin_password` com um usuário admin (`UPDATE users SET role = 'admin' WHERE email = '...';`). Sem isso, essas requests são puladas.\n\n**Sessão:** trocar a senha, fazer logout ou ter a conta desativada invalida o token; a API responde 401 \"Sessão expirada. Faça login novamente.\" e o front deve voltar para o login.\n\nVariáveis preenchidas automaticamente: `user_id`, `user_email`, `user_cpf`, `token`, `admin_token`, `admin_cpf`, `transaction_id`, `deactivation_request_id`.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -667,6 +667,100 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar todos os lançamentos (admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/transactions/all?search={{user_cpf}}&limit=50&offset=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "transactions",
+                "all"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{user_cpf}}",
+                  "description": "Parte do nome, e-mail ou CPF do dono da conta"
+                },
+                {
+                  "key": "category",
+                  "value": "transferencia",
+                  "description": "deposito, transferencia ou estorno",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "saida",
+                  "description": "entrada ou saida",
+                  "disabled": true
+                },
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "description": "Data inicial (AAAA-MM-DD, inclusive, horário de Brasília)",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "description": "Data final (AAAA-MM-DD, inclusive, horário de Brasília)",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Itens por página (1 a 100)"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Quantos itens pular"
+                }
+              ]
+            },
+            "description": "Todos os lançamentos do sistema, mais recentes primeiro, com o dono de cada conta em `owner`. **Somente admin.** Todos os filtros são opcionais; aqui a busca vem preenchida com o CPF do usuário de teste.\n\nPulada se `admin_token` estiver vazio.\n\nErros: 400 (filtro inválido), 401, 403 (não é admin)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Só lançamentos do usuário buscado', () => {",
+                  "  const items = pm.response.json();",
+                  "  pm.expect(items.length).to.be.above(0);",
+                  "  items.forEach((t) => pm.expect(t.owner.email).to.eql(pm.collectionVariables.get('user_email')));",
+                  "});"
                 ]
               }
             }

@@ -445,4 +445,78 @@ describe('TransactionsService', () => {
       );
     });
   });
+
+  describe('findAllAdmin', () => {
+    const page = { limit: 50, offset: 0 };
+    const whereArg = () =>
+      (
+        prisma.transactions.findMany.mock.calls[0][0] as {
+          where: Record<string, unknown>;
+        }
+      ).where;
+
+    it('devolve os lançamentos com o dono da conta', async () => {
+      prisma.transactions.findMany.mockResolvedValue([
+        entry({
+          accounts_transactions_account_idToaccounts: {
+            users: { name: 'Beltrano', email: 'beltrano@email.com' },
+          },
+        }),
+      ]);
+
+      const [result] = await service.findAllAdmin(page);
+
+      expect(result).toMatchObject({
+        id: 'tx-1',
+        amount: '50.00',
+        owner: { name: 'Beltrano', email: 'beltrano@email.com' },
+        counterparty: { name: 'Fulano', email: 'fulano@email.com' },
+      });
+      expect(result).not.toHaveProperty(
+        'accounts_transactions_account_idToaccounts',
+      );
+    });
+
+    it('converte o período em dias inteiros no horário de Brasília', async () => {
+      prisma.transactions.findMany.mockResolvedValue([]);
+
+      await service.findAllAdmin({
+        ...page,
+        from: '2026-10-01',
+        to: '2026-10-31',
+      });
+
+      expect(whereArg().created_at).toEqual({
+        gte: new Date('2026-10-01T03:00:00Z'),
+        lt: new Date('2026-11-01T03:00:00Z'),
+      });
+    });
+
+    it('busca por nome, e-mail ou CPF (ignorando pontuação do CPF)', async () => {
+      prisma.transactions.findMany.mockResolvedValue([]);
+
+      await service.findAllAdmin({ ...page, search: ' 123.456 ' });
+
+      expect(whereArg().accounts_transactions_account_idToaccounts).toEqual({
+        users: {
+          OR: [
+            { name: { contains: '123.456', mode: 'insensitive' } },
+            { email: { contains: '123.456', mode: 'insensitive' } },
+            { cpf: { contains: '123456' } },
+          ],
+        },
+      });
+    });
+
+    it('sem dígitos na busca, não filtra por CPF', async () => {
+      prisma.transactions.findMany.mockResolvedValue([]);
+
+      await service.findAllAdmin({ ...page, search: 'fulano' });
+
+      const filter = whereArg().accounts_transactions_account_idToaccounts as {
+        users: { OR: unknown[] };
+      };
+      expect(filter.users.OR).toHaveLength(2);
+    });
+  });
 });

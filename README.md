@@ -95,7 +95,7 @@ Ninguém vira admin pela API (o campo `role` é recusado no cadastro e no update
 UPDATE users SET role = 'admin' WHERE email = 'fulano@email.com';
 ```
 
-Rotas exclusivas de admin: `GET /users` (listar todos), `DELETE /users/:id` (remover usuário), `POST /transactions/deposit` (depósito) e a avaliação de desativações (`GET /deactivation-requests`, `PATCH .../approve`, `PATCH .../reject`).
+Rotas exclusivas de admin: `GET /users` (listar todos), `DELETE /users/:id` (remover usuário), `POST /transactions/deposit` (depósito), `POST /transactions/:id/reverse` (estorno), `GET /transactions/all` (todos os lançamentos) e a avaliação de desativações (`GET /deactivation-requests`, `PATCH .../approve`, `PATCH .../reject`).
 
 ### Desativação de conta
 
@@ -120,6 +120,7 @@ users 1───1 accounts (balance) 1───N transactions
   - Depósito e transferência para conta desativada são recusados (`422`).
   - `POST /transactions/:id/reverse` (**somente admin**): estorno. Lança o movimento inverso com `category: "estorno"` e `reversal_of` apontando para o original. Estornar qualquer ponta de uma transferência desfaz as duas. Cada lançamento só pode ser estornado uma vez (`409`), estorno não se estorna (`422`) e é preciso saldo na conta que devolve (`422`).
   - `GET /transactions` (extrato, com `limit`/`offset`) e `GET /transactions/:id`.
+  - `GET /transactions/all` (**somente admin**): todos os lançamentos do sistema, mais recentes primeiro, com o dono da conta em `owner`. Filtros opcionais: `search` (parte do nome, e-mail ou CPF), `category`, `type`, `from` e `to` (datas `AAAA-MM-DD`, inclusive, no horário de Brasília), além de `limit`/`offset`.
 - **Valores:** `NUMERIC(15,2)` no banco; na API, entram como número (máx. 2 casas, de 0,01 a 1.000.000 por operação) e saem como texto (`"200.00"`).
 
 Garantias:

@@ -13,7 +13,11 @@ import { DepositDto } from './dto/deposit.dto.js';
 import { TransferDto } from './dto/transfer.dto.js';
 import { ReverseTransactionDto } from './dto/reverse-transaction.dto.js';
 import { ListTransactionsQueryDto } from './dto/list-transactions.query.dto.js';
-import { Transaction } from './entities/transaction.entity.js';
+import { ListAllTransactionsQueryDto } from './dto/list-all-transactions.query.dto.js';
+import {
+  AdminTransaction,
+  Transaction,
+} from './entities/transaction.entity.js';
 
 const transactionSelect = {
   id: true,
@@ -270,6 +274,57 @@ export class TransactionsService {
     return entries.map(toTransaction);
   }
 
+  /** Todos os lançamentos do sistema (admin), com filtros, mais recentes primeiro. */
+  async findAllAdmin(
+    query: ListAllTransactionsQueryDto,
+  ): Promise<AdminTransaction[]> {
+    const where: Prisma.transactionsWhereInput = {
+      category: query.category,
+      type: query.type,
+    };
+
+    if (query.from || query.to) {
+      // As datas chegam como dia (AAAA-MM-DD) no horário de Brasília (UTC-3).
+      // "to" é inclusive: pega tudo antes do início do dia seguinte.
+      where.created_at = {
+        gte: query.from ? brasiliaMidnight(query.from) : undefined,
+        lt: query.to ? brasiliaMidnight(query.to, 1) : undefined,
+      };
+    }
+
+    const search = query.search?.trim();
+    if (search) {
+      // CPF é guardado só com dígitos: "123.456" vira "123456"
+      const digits = search.replace(/\D/g, '');
+      where.accounts_transactions_account_idToaccounts = {
+        users: {
+          OR: [
+            { name: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } },
+            ...(digits ? [{ cpf: { contains: digits } }] : []),
+          ],
+        },
+      };
+    }
+
+    const entries = await this.prisma.transactions.findMany({
+      where,
+      orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+      take: query.limit,
+      skip: query.offset,
+      select: {
+        ...transactionSelect,
+        accounts_transactions_account_idToaccounts: {
+          select: { users: { select: { name: true, email: true } } },
+        },
+      },
+    });
+    return entries.map(
+      ({ accounts_transactions_account_idToaccounts: account, ...entry }) =>
+        Object.assign(toTransaction(entry), { owner: account.users }),
+    );
+  }
+
   /** Um lançamento: o usuário vê só os da própria conta; o admin vê qualquer um. */
   async findOne(user_id: string, id: string): Promise<Transaction> {
     const user = await this.prisma.users.findUnique({
@@ -450,6 +505,13 @@ async function findRecipientAccountId(
     throw new UnprocessableEntityException('Conta de destino desativada');
   }
   return account.id;
+}
+
+/** Meia-noite (horário de Brasília, UTC-3) do dia informado, somando `plusDays`. */
+function brasiliaMidnight(day: string, plusDays = 0): Date {
+  const date = new Date(`${day}T00:00:00-03:00`);
+  date.setUTCDate(date.getUTCDate() + plusDays);
+  return date;
 }
 
 function isUniqueViolation(error: unknown): boolean {

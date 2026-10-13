@@ -74,6 +74,7 @@ model transactions {
 
   @@index([account_id, created_at(sort: Desc)])
   @@index([operation_id])
+  @@index([created_at(sort: Desc), id(sort: Desc)], map: "transactions_created_at_idx")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
