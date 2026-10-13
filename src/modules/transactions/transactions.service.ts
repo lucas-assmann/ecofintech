@@ -8,16 +8,24 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import { Prisma } from '../../database/generated/prisma/client.js';
-import type { transaction_type } from '../../database/generated/prisma/enums.js';
+import type {
+  transaction_category,
+  transaction_type,
+} from '../../database/generated/prisma/enums.js';
 import { DepositDto } from './dto/deposit.dto.js';
 import { TransferDto } from './dto/transfer.dto.js';
 import { ReverseTransactionDto } from './dto/reverse-transaction.dto.js';
 import { ListTransactionsQueryDto } from './dto/list-transactions.query.dto.js';
 import { ListAllTransactionsQueryDto } from './dto/list-all-transactions.query.dto.js';
+import { SummaryQueryDto } from './dto/summary.query.dto.js';
 import {
   AdminTransaction,
   Transaction,
 } from './entities/transaction.entity.js';
+import { TransactionSummary } from './entities/transaction-summary.entity.js';
+
+/** Fuso usado para dizer "que dia é" um lançamento (Brasil, sem horário de verão) */
+const TIME_ZONE = 'America/Sao_Paulo';
 
 const transactionSelect = {
   id: true,
@@ -272,6 +280,83 @@ export class TransactionsService {
       select: transactionSelect,
     });
     return entries.map(toTransaction);
+  }
+
+  /**
+   * Resumo de entradas e saídas da conta do usuário nos últimos `days` dias
+   * (contando hoje, no horário de Brasília), para o dashboard.
+   */
+  async summary(
+    user_id: string,
+    { days }: SummaryQueryDto,
+  ): Promise<TransactionSummary> {
+    const account_id = await findAccountIdByUser(this.prisma, user_id);
+    // 7 e 30 dias: uma barra por dia. 90 dias: uma por semana (seriam 90 barras).
+    const bucketDays = days === 90 ? 7 : 1;
+
+    // Limites calculados uma vez só, para as duas consultas usarem o mesmo período
+    const [{ from, to }] = await this.prisma.$queryRaw<
+      { from: string; to: string }[]
+    >`
+      SELECT to_char(hoje - ${days - 1}::int, 'YYYY-MM-DD') AS "from",
+             to_char(hoje, 'YYYY-MM-DD') AS "to"
+      FROM (SELECT (now() AT TIME ZONE ${TIME_ZONE})::date AS hoje) AS agora`;
+
+    // generate_series cria todos os intervalos do período, inclusive os sem
+    // movimentação; o LEFT JOIN deixa esses com soma 0 em vez de sumirem.
+    // A comparação é feita em created_at (e não na data convertida) para o
+    // banco conseguir usar o índice (account_id, created_at).
+    const series = await this.prisma.$queryRaw<
+      { date: string; entradas: Prisma.Decimal; saidas: Prisma.Decimal }[]
+    >`
+      SELECT to_char(i.dia, 'YYYY-MM-DD') AS date,
+             COALESCE(SUM(t.amount) FILTER (WHERE t.type = 'entrada'), 0) AS entradas,
+             COALESCE(SUM(t.amount) FILTER (WHERE t.type = 'saida'), 0) AS saidas
+      FROM generate_series(${from}::date, ${to}::date, make_interval(days => ${bucketDays}::int)) AS i(dia)
+      LEFT JOIN transactions t
+        ON t.account_id = ${account_id}::uuid
+       AND t.created_at >= (i.dia::date::timestamp AT TIME ZONE ${TIME_ZONE})
+       AND t.created_at < ((i.dia::date + ${bucketDays}::int)::timestamp AT TIME ZONE ${TIME_ZONE})
+      GROUP BY i.dia
+      ORDER BY i.dia`;
+
+    const byCategory = await this.prisma.$queryRaw<
+      {
+        category: transaction_category;
+        type: transaction_type;
+        total: Prisma.Decimal;
+        count: number;
+      }[]
+    >`
+      SELECT category, type, SUM(amount) AS total, COUNT(*)::int AS count
+      FROM transactions
+      WHERE account_id = ${account_id}::uuid
+        AND created_at >= (${from}::date::timestamp AT TIME ZONE ${TIME_ZONE})
+      GROUP BY category, type
+      ORDER BY total DESC`;
+
+    const sum = (values: Prisma.Decimal[]) =>
+      values.reduce((acc, value) => acc.plus(value), new Prisma.Decimal(0));
+    const entradas = sum(series.map((row) => row.entradas));
+    const saidas = sum(series.map((row) => row.saidas));
+
+    return {
+      from,
+      to,
+      bucket: bucketDays === 1 ? 'day' : 'week',
+      total_entradas: entradas.toFixed(2),
+      total_saidas: saidas.toFixed(2),
+      resultado: entradas.minus(saidas).toFixed(2),
+      series: series.map((row) => ({
+        date: row.date,
+        entradas: new Prisma.Decimal(row.entradas).toFixed(2),
+        saidas: new Prisma.Decimal(row.saidas).toFixed(2),
+      })),
+      by_category: byCategory.map((row) => ({
+        ...row,
+        total: new Prisma.Decimal(row.total).toFixed(2),
+      })),
+    };
   }
 
   /** Todos os lançamentos do sistema (admin), com filtros, mais recentes primeiro. */

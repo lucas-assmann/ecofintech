@@ -56,6 +56,7 @@ describe('TransactionsService', () => {
       count: vi.fn(),
     },
     $transaction: vi.fn(),
+    $queryRaw: vi.fn(),
   };
 
   const sender = (id: string) =>
@@ -517,6 +518,60 @@ describe('TransactionsService', () => {
         users: { OR: unknown[] };
       };
       expect(filter.users.OR).toHaveLength(2);
+    });
+  });
+
+  describe('summary', () => {
+    const mockQueries = (
+      series: { date: string; entradas: string; saidas: string }[],
+    ) => {
+      prisma.accounts.findUnique.mockResolvedValue({ id: 'acc-a' });
+      prisma.$queryRaw
+        .mockResolvedValueOnce([{ from: '2026-10-07', to: '2026-10-13' }])
+        .mockResolvedValueOnce(
+          series.map((row) => ({
+            date: row.date,
+            entradas: D(row.entradas),
+            saidas: D(row.saidas),
+          })),
+        )
+        .mockResolvedValueOnce([
+          { category: 'deposito', type: 'entrada', total: D('100'), count: 1 },
+        ]);
+    };
+
+    it('soma os intervalos e calcula o resultado (pode ser negativo)', async () => {
+      mockQueries([
+        { date: '2026-10-07', entradas: '100', saidas: '0' },
+        { date: '2026-10-08', entradas: '0', saidas: '150.5' },
+      ]);
+
+      const result = await service.summary('user-a', { days: 7 });
+
+      expect(result).toMatchObject({
+        from: '2026-10-07',
+        to: '2026-10-13',
+        bucket: 'day',
+        total_entradas: '100.00',
+        total_saidas: '150.50',
+        resultado: '-50.50',
+        series: [
+          { date: '2026-10-07', entradas: '100.00', saidas: '0.00' },
+          { date: '2026-10-08', entradas: '0.00', saidas: '150.50' },
+        ],
+        by_category: [
+          { category: 'deposito', type: 'entrada', total: '100.00', count: 1 },
+        ],
+      });
+    });
+
+    it('agrupa por semana no período de 90 dias', async () => {
+      mockQueries([]);
+
+      const result = await service.summary('user-a', { days: 90 });
+
+      expect(result.bucket).toBe('week');
+      expect(result.resultado).toBe('0.00');
     });
   });
 });

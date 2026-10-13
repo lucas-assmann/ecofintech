@@ -37,10 +37,12 @@ import { TransferDto } from './dto/transfer.dto.js';
 import { ReverseTransactionDto } from './dto/reverse-transaction.dto.js';
 import { ListTransactionsQueryDto } from './dto/list-transactions.query.dto.js';
 import { ListAllTransactionsQueryDto } from './dto/list-all-transactions.query.dto.js';
+import { SummaryQueryDto } from './dto/summary.query.dto.js';
 import {
   AdminTransaction,
   Transaction,
 } from './entities/transaction.entity.js';
+import { TransactionSummary } from './entities/transaction-summary.entity.js';
 
 // Movimentações são imutáveis: não há rotas para editar nem apagar.
 // Correções são feitas por estorno.
@@ -144,7 +146,20 @@ export class TransactionsController {
     return this.transactionsService.findAll(user.sub, query);
   }
 
-  // Precisa vir antes de GET :id, senão "all" seria lido como um id
+  // As rotas fixas (summary, all) precisam vir antes de GET :id,
+  // senão "summary" e "all" seriam lidos como um id
+  @Get('summary')
+  @ApiOperation({
+    summary:
+      'Resumo de entradas e saídas do usuário logado no período (dashboard)',
+  })
+  @ApiOkResponse({ type: TransactionSummary })
+  @ApiBadRequestResponse({ description: 'Período inválido (use 7, 30 ou 90)' })
+  summary(@CurrentUser() user: JwtPayload, @Query() query: SummaryQueryDto) {
+    return this.transactionsService.summary(user.sub, query);
+  }
+
+
   @Get('all')
   @Roles('admin')
   @ApiOperation({
