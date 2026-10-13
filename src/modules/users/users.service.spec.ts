@@ -1,17 +1,41 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import { DatabaseService } from '../../database/database.service.js';
+import { PrismaService } from '../../database/prisma.service.js';
+import { Prisma } from '../../database/generated/prisma/client.js';
 import { verifyPassword } from '../../common/utils/password.js';
 import { UsersService } from './users.service.js';
 
+const prismaError = (code: string) =>
+  new Prisma.PrismaClientKnownRequestError('erro', {
+    code,
+    clientVersion: 'test',
+  });
+
+const dbUser = {
+  id: '1',
+  name: 'Maria Silva',
+  email: 'maria@email.com',
+  dateOfBirth: new Date('1995-08-20'),
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
 describe('UsersService', () => {
   let service: UsersService;
-  const db = { query: vi.fn() };
+  const prisma = {
+    user: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+  };
 
   beforeEach(async () => {
-    db.query.mockReset();
+    vi.resetAllMocks();
     const module: TestingModule = await Test.createTestingModule({
-      providers: [UsersService, { provide: DatabaseService, useValue: db }],
+      providers: [UsersService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
@@ -26,19 +50,22 @@ describe('UsersService', () => {
     };
 
     it('salva o hash da senha (não a senha) e o e-mail em minúsculas', async () => {
-      db.query.mockResolvedValue([{ id: '1' }]);
+      prisma.user.create.mockResolvedValue(dbUser);
 
-      await service.create(dto);
+      const user = await service.create(dto);
 
-      const [sql, params] = db.query.mock.calls[0] as [string, string[]];
-      expect(sql).toContain('INSERT INTO users');
-      expect(params[1]).toBe('maria@email.com');
-      expect(params[3]).not.toBe(dto.password);
-      expect(await verifyPassword(dto.password, params[3])).toBe(true);
+      const { data } = prisma.user.create.mock.calls[0][0] as {
+        data: { email: string; passwordHash: string };
+      };
+      expect(data.email).toBe('maria@email.com');
+      expect(data.passwordHash).not.toBe(dto.password);
+      expect(await verifyPassword(dto.password, data.passwordHash)).toBe(true);
+      expect(user.dateOfBirth).toBe('1995-08-20');
+      expect(user).not.toHaveProperty('passwordHash');
     });
 
     it('lança Conflict quando o e-mail já existe', async () => {
-      db.query.mockRejectedValue({ code: '23505' });
+      prisma.user.create.mockRejectedValue(prismaError('P2002'));
 
       await expect(service.create(dto)).rejects.toBeInstanceOf(
         ConflictException,
@@ -47,26 +74,23 @@ describe('UsersService', () => {
   });
 
   it('findOne lança NotFound quando o usuário não existe', async () => {
-    db.query.mockResolvedValue([]);
+    prisma.user.findUnique.mockResolvedValue(null);
 
     await expect(service.findOne('id-inexistente')).rejects.toBeInstanceOf(
       NotFoundException,
     );
   });
 
-  it('update monta o SET só com os campos enviados', async () => {
-    db.query.mockResolvedValue([{ id: '1' }]);
+  it('update lança NotFound quando o usuário não existe', async () => {
+    prisma.user.update.mockRejectedValue(prismaError('P2025'));
 
-    await service.update('1', { name: 'Novo Nome' });
-
-    const [sql, params] = db.query.mock.calls[0] as [string, unknown[]];
-    expect(sql).toContain('SET name = $1, updated_at = now()');
-    expect(sql).toContain('WHERE id = $2');
-    expect(params).toEqual(['Novo Nome', '1']);
+    await expect(
+      service.update('1', { name: 'Novo Nome' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('remove lança NotFound quando nada foi apagado', async () => {
-    db.query.mockResolvedValue([]);
+  it('remove lança NotFound quando o usuário não existe', async () => {
+    prisma.user.delete.mockRejectedValue(prismaError('P2025'));
 
     await expect(service.remove('1')).rejects.toBeInstanceOf(NotFoundException);
   });

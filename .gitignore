@@ -5,6 +5,9 @@ node_modules/
 dist/
 build/
 
+# prisma client (gerado por `prisma generate`)
+src/database/generated/
+
 # env
 .env
 .env.*

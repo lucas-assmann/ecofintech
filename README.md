@@ -22,26 +22,37 @@ A API sobe em `http://localhost:3000`.
 
 ## Banco de dados
 
-PostgreSQL acessado com **SQL puro** via [`pg`](https://node-postgres.com/) (sem ORM).
+PostgreSQL. As **tabelas são escritas em SQL** (migrations) e o **código usa o Prisma**, gerado a partir do banco.
+
+Primeira vez:
 
 1. Crie o banco: `CREATE DATABASE ecofintech;` (pelo pgAdmin ou `psql`).
 2. Configure `DATABASE_URL` no `.env`.
-3. Rode as migrations: `npm run db:migrate`.
+3. `npm run db:migrate` para criar as tabelas.
+4. `npm run db:pull` para gerar o client do Prisma.
 
-**Migrations** ficam em `src/database/migrations/` como arquivos `.sql` numerados (`001_...`, `002_...`) e são aplicadas em ordem. As já aplicadas ficam registradas na tabela `schema_migrations`. Nunca edite uma migration que já rodou; crie uma nova.
+### Fluxo para mudar o banco
 
-**No código**, injete o `DatabaseService` (`src/database/database.service.ts`) em qualquer service:
+1. Crie uma migration SQL nova em `src/database/migrations/`, numerada em sequência (ex.: `003_create_accounts.sql`). Nunca edite uma que já rodou.
+2. `npm run db:migrate` aplica as pendentes (as já aplicadas ficam em `schema_migrations`).
+3. `npm run db:pull` lê o banco, atualiza `src/database/schema.prisma` e regenera os tipos.
+4. No `schema.prisma`, dê nomes camelCase aos models e campos novos com `@@map`/`@map` (ex.: `model Account { ... @@map("accounts") }`). O `db pull` mantém esses nomes nas próximas vezes.
+
+> Não use `prisma migrate` nem edite colunas pelo `schema.prisma`: a fonte da verdade são as migrations SQL.
+
+### No código
+
+Injete o `PrismaService` (`src/database/prisma.service.ts`) em qualquer service:
 
 ```ts
-constructor(private readonly db: DatabaseService) {}
+constructor(private readonly prisma: PrismaService) {}
 
 findByEmail(email: string) {
-  return this.db.query<User>('SELECT * FROM users WHERE email = $1', [email]);
+  return this.prisma.user.findUnique({ where: { email } });
 }
 ```
 
-Use sempre parâmetros (`$1`, `$2`...) em vez de concatenar valores na string, para evitar SQL injection. Para operações que precisam ser atômicas (ex.: transferência), use `db.transaction(...)`.
-
+Para operações atômicas (ex.: transferência), use `this.prisma.$transaction(...)`. Para SQL direto, `this.prisma.$queryRaw`.
 ## Documentação da API
 
 Com a API rodando:
@@ -72,7 +83,7 @@ src/
 │   └── users/
 ├── common/            # guards, filters, interceptors, utils
 ├── config/            # configuração e variáveis de ambiente
-├── database/          # conexão, migrations (.sql) e script de migrate
+├── database/          # Prisma (schema + service), migrations (.sql) e script de migrate
 │   └── migrations/
 ├── app.module.ts
 └── main.ts

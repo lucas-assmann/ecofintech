@@ -1,10 +1,10 @@
 import { Global, Module } from '@nestjs/common';
-import { DatabaseService } from './database.service.js';
+import { PrismaService } from './prisma.service.js';
 
-// Global: qualquer módulo pode injetar DatabaseService sem importar este módulo
+// Global: qualquer módulo pode injetar PrismaService sem importar este módulo
 @Global()
 @Module({
-  providers: [DatabaseService],
-  exports: [DatabaseService],
+  providers: [PrismaService],
+  exports: [PrismaService],
 })
 export class DatabaseModule {}
