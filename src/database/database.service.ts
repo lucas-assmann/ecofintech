@@ -3,6 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import pg from 'pg';
 import type { PoolClient, QueryResultRow } from 'pg';
 
+// Por padrão o pg converte DATE em Date do JS à meia-noite no fuso local, o que
+// desloca o dia ao virar JSON (ex.: 2000-01-15 vira 2000-01-15T03:00:00Z).
+// Mantemos DATE como texto 'YYYY-MM-DD'.
+pg.types.setTypeParser(pg.types.builtins.DATE, (value) => value);
+
 @Injectable()
 export class DatabaseService implements OnModuleDestroy {
   // Pool reaproveita conexões abertas em vez de abrir uma nova a cada query
