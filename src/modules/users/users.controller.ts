@@ -25,6 +25,7 @@ import {
 } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+import { Roles } from '../../common/decorators/roles.decorator.js';
 import type { JwtPayload } from '../../common/guards/auth.guard.js';
 import { UsersService } from './users.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
@@ -48,8 +49,10 @@ export class UsersController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Lista todos os usuários' })
+  @Roles('admin')
+  @ApiOperation({ summary: 'Lista todos os usuários (somente admin)' })
   @ApiOkResponse({ type: [User] })
+  @ApiForbiddenResponse({ description: 'Usuário não é admin' })
   findAll() {
     return this.usersService.findAll();
   }

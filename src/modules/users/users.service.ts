@@ -18,6 +18,7 @@ const userSelect = {
   name: true,
   email: true,
   date_of_birth: true,
+  role: true,
   created_at: true,
   updated_at: true,
 } satisfies Prisma.usersSelect;

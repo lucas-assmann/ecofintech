@@ -65,6 +65,18 @@ Login com JWT: `POST /auth/login` recebe `email` e `password` e devolve um `acce
 - Nas rotas `/users/:id`, o id precisa ser o do usuário logado; caso contrário, 403.
 - No Swagger, clique em **Authorize** e cole o token.
 
+### Perfis (roles)
+
+Cada usuário tem um `role`: `user` (padrão) ou `admin`. Para restringir uma rota, use `@Roles('admin')`. O `RolesGuard` lê o perfil **do banco** a cada requisição, então promover ou rebaixar alguém vale na hora, sem novo login.
+
+Ninguém vira admin pela API (o campo `role` é recusado no cadastro e no update). Para promover, rode no banco:
+
+```sql
+UPDATE users SET role = 'admin' WHERE email = 'fulano@email.com';
+```
+
+Hoje só `GET /users` (listar todos) é exclusiva de admin.
+
 ## Documentação da API
 
 Com a API rodando:

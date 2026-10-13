@@ -146,7 +146,7 @@
           "request": {
             "method": "GET",
             "url": "{{base_url}}/users",
-            "description": "Lista todos os usuários, do mais recente para o mais antigo."
+            "description": "Lista todos os usuários, do mais recente para o mais antigo. **Somente admin.**\n\nO usuário criado em Cadastrar é comum, então aqui recebe 403. Com o token de um admin, retorna 200.\n\nPara promover alguém (no pgAdmin): `UPDATE users SET role = 'admin' WHERE email = '...';`"
           },
           "event": [
             {
@@ -154,8 +154,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Retorna uma lista', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                  "pm.test('200 para admin, 403 para usuário comum', () => pm.expect(pm.response.code).to.be.oneOf([200, 403]));",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('Retorna uma lista', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                  "}"
                 ]
               }
             }
