@@ -7,6 +7,7 @@ import {
   Post,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiForbiddenResponse,
   ApiNoContentResponse,
@@ -23,6 +24,9 @@ import { User } from '../users/entities/user.entity.js';
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { LoginResponseDto } from './dto/login-response.dto.js';
+import { ForgotPasswordDto } from './dto/forgot-password.dto.js';
+import { ResetPasswordDto } from './dto/reset-password.dto.js';
+import { MessageResponseDto } from './dto/message-response.dto.js';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -41,6 +45,37 @@ export class AuthController {
   @ApiForbiddenResponse({ description: 'Conta desativada' })
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Envia por e-mail um link para redefinir a senha (resposta igual exista ou não o e-mail)',
+  })
+  @ApiOkResponse({ type: MessageResponseDto })
+  async forgotPassword(
+    @Body() dto: ForgotPasswordDto,
+  ): Promise<MessageResponseDto> {
+    await this.authService.forgotPassword(dto);
+    return {
+      message:
+        'Se o e-mail estiver cadastrado, enviamos um link para redefinir a senha.',
+    };
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary:
+      'Define a nova senha usando o token do e-mail (encerra todas as sessões)',
+  })
+  @ApiNoContentResponse({ description: 'Senha alterada' })
+  @ApiBadRequestResponse({ description: 'Link inválido, expirado ou já usado' })
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 
   @Post('logout')

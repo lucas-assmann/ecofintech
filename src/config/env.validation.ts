@@ -46,6 +46,38 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   CORS_ORIGINS?: string;
+
+  /** Endereço do front, usado nos links enviados por e-mail */
+  @IsOptional()
+  @Matches(/^https?:\/\/[^/]+$/, {
+    message:
+      'APP_URL deve ser uma URL sem barra no final, ex.: http://localhost:5173',
+  })
+  APP_URL?: string;
+
+  // E-mail (SMTP). Sem SMTP_HOST, a API não envia: escreve o conteúdo no terminal.
+  @IsOptional()
+  @IsString()
+  SMTP_HOST?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  SMTP_PORT?: number;
+
+  @IsOptional()
+  @IsString()
+  SMTP_USER?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_PASS?: string;
+
+  /** Remetente, ex.: Ecofintech <nao-responda@ecofintech.com> */
+  @IsOptional()
+  @IsString()
+  MAIL_FROM?: string;
 }
 
 /**

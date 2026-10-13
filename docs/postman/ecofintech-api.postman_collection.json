@@ -89,6 +89,10 @@
       "key": "deactivation_request_id",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "reset_token",
+      "value": ""
     }
   ],
   "item": [
@@ -271,6 +275,90 @@
                   "    if (!err && res.code === 200) pm.collectionVariables.set('admin_cpf', res.json().cpf);",
                   "  });",
                   "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Esqueci minha senha",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/forgot-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Envia um e-mail com o link para criar uma nova senha (vale 30 minutos, uso único). A resposta é **sempre a mesma**, exista ou não o e-mail, para não revelar quem tem conta. No máximo um e-mail por minuto por usuário.\n\nEm desenvolvimento os e-mails chegam no Mailpit: http://localhost:8025. Copie o `token` do link para a variável `reset_token` e rode a próxima request."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Mensagem genérica', () => pm.expect(pm.response.json().message).to.include('Se o e-mail estiver cadastrado'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Redefinir senha (token do e-mail)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/reset-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{reset_token}}\",\n  \"new_password\": \"novaSenha456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Troca a senha com o `token` recebido no link do e-mail. Encerra todas as sessões do usuário (os tokens de acesso antigos passam a responder 401).\n\nPulada se `reset_token` estiver vazio.\n\nErros: 400 (senha com menos de 8 caracteres, ou link inválido, expirado ou já usado)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reset_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
                 ]
               }
             }
@@ -639,6 +727,57 @@
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "pm.test('Retorna uma lista', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resumo do período (dashboard)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/transactions/summary?days=30",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "transactions",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "30",
+                  "description": "Período em dias, contando hoje: 7, 30 ou 90"
+                }
+              ]
+            },
+            "description": "Totais de entradas e saídas do usuário logado no período, para o dashboard: `total_entradas`, `total_saidas`, `resultado`, `series` (um item por dia, ou por semana em 90 dias, inclusive os zerados) e `by_category`. Os dias seguem o horário de Brasília.\n\nErros: 400 (período diferente de 7, 30 ou 90), 401."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Um item por dia no período', () => pm.expect(pm.response.json().series).to.have.length(30));",
+                  "pm.test('Resultado = entradas - saídas', () => {",
+                  "  const s = pm.response.json();",
+                  "  pm.expect(Number(s.resultado)).to.be.closeTo(Number(s.total_entradas) - Number(s.total_saidas), 0.001);",
+                  "});"
                 ]
               }
             }

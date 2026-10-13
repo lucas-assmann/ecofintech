@@ -11,7 +11,7 @@ Backend da Ecofintech, construído com [NestJS](https://nestjs.com/) + TypeScrip
 
 ```bash
 npm install
-cp .env.example .env   # ajuste os valores
+# crie o arquivo .env na raiz (variáveis abaixo)
 
 npm run start:dev      # desenvolvimento (watch)
 npm run build          # build de produção
@@ -19,6 +19,32 @@ npm run start:prod     # roda o build
 ```
 
 A API sobe em `http://localhost:3000`.
+
+Variáveis do `.env` (a API valida todas ao iniciar e avisa o que estiver faltando):
+
+| Variável | Para que serve | Exemplo |
+|---|---|---|
+| `DATABASE_URL` | Conexão com o PostgreSQL | `postgresql://postgres:SENHA@localhost:5432/ecofintech` |
+| `JWT_SECRET` | Segredo que assina os tokens (longo e aleatório; nunca reutilize o de dev em produção) | |
+| `JWT_EXPIRES_IN` | Validade do token, em segundos (mínimo 60) | `3600` |
+| `PORT` | Porta da API (opcional) | `3000` |
+| `NODE_ENV` | Ambiente (opcional) | `development` |
+| `CORS_ORIGINS` | Endereços do front autorizados, separados por vírgula | `http://localhost:5173` |
+| `APP_URL` | Endereço do front, usado nos links dos e-mails | `http://localhost:5173` |
+| `SMTP_HOST` / `SMTP_PORT` | Servidor de e-mail (sem `SMTP_HOST`, o e-mail é só escrito no terminal da API) | `localhost` / `1025` |
+| `SMTP_USER` / `SMTP_PASS` | Login do servidor de e-mail, se ele exigir | |
+| `MAIL_FROM` | Remetente | `Ecofintech <nao-responda@ecofintech.local>` |
+
+### E-mails em desenvolvimento (Mailpit)
+
+O [Mailpit](https://mailpit.axllent.org) finge ser um servidor de e-mail: tudo o que a API envia aparece numa caixa de entrada local, sem sair para a internet.
+
+```bash
+winget install axllent.mailpit   # uma vez
+mailpit                          # SMTP na porta 1025, caixa de entrada em http://localhost:8025
+```
+
+Em produção, basta apontar `SMTP_*` para um provedor de verdade (Gmail, Resend, SES...).
 
 ## Banco de dados
 
@@ -95,6 +121,8 @@ Ninguém vira admin pela API (o campo `role` é recusado no cadastro e no update
 UPDATE users SET role = 'admin' WHERE email = 'fulano@email.com';
 ```
 
+**Esqueci minha senha:** `POST /auth/forgot-password` envia um link de uso único (30 minutos) e responde igual exista ou não o e-mail; `POST /auth/reset-password` troca a senha com o token do link e encerra todas as sessões. No banco fica só o hash SHA-256 do token (tabela `password_reset_tokens`).
+
 Rotas exclusivas de admin: `GET /users` (listar todos), `DELETE /users/:id` (remover usuário), `POST /transactions/deposit` (depósito), `POST /transactions/:id/reverse` (estorno), `GET /transactions/all` (todos os lançamentos) e a avaliação de desativações (`GET /deactivation-requests`, `PATCH .../approve`, `PATCH .../reject`).
 
 ### Desativação de conta
@@ -120,6 +148,7 @@ users 1───1 accounts (balance) 1───N transactions
   - Depósito e transferência para conta desativada são recusados (`422`).
   - `POST /transactions/:id/reverse` (**somente admin**): estorno. Lança o movimento inverso com `category: "estorno"` e `reversal_of` apontando para o original. Estornar qualquer ponta de uma transferência desfaz as duas. Cada lançamento só pode ser estornado uma vez (`409`), estorno não se estorna (`422`) e é preciso saldo na conta que devolve (`422`).
   - `GET /transactions` (extrato, com `limit`/`offset`) e `GET /transactions/:id`.
+  - `GET /transactions/summary?days=7|30|90` (padrão 30): resumo do usuário logado para o dashboard. Totais de entradas, saídas e resultado, a série por dia (ou por semana em 90 dias, com os intervalos sem movimentação zerados) e os totais por categoria. Os dias seguem o horário de Brasília.
   - `GET /transactions/all` (**somente admin**): todos os lançamentos do sistema, mais recentes primeiro, com o dono da conta em `owner`. Filtros opcionais: `search` (parte do nome, e-mail ou CPF), `category`, `type`, `from` e `to` (datas `AAAA-MM-DD`, inclusive, no horário de Brasília), além de `limit`/`offset`.
 - **Valores:** `NUMERIC(15,2)` no banco; na API, entram como número (máx. 2 casas, de 0,01 a 1.000.000 por operação) e saem como texto (`"200.00"`).
 
