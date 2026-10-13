@@ -11,7 +11,7 @@ export function ProfilePage() {
   if (!user) return null
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-6xl">
       <PageHeader
         title="Perfil"
         description={
@@ -21,10 +21,12 @@ export function ProfilePage() {
           </span>
         }
       />
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
         <PersonalDataCard user={user} />
-        <PasswordCard userId={user.id} />
-        <DeactivationCard />
+        <div className="space-y-6">
+          <PasswordCard userId={user.id} />
+          <DeactivationCard />
+        </div>
       </div>
     </div>
   )

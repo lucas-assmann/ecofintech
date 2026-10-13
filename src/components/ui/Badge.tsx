@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react'
 
 const tones = {
-  neutral: 'bg-slate-100 text-slate-700',
-  green: 'bg-brand-100 text-brand-800',
-  red: 'bg-red-100 text-red-800',
-  amber: 'bg-amber-100 text-amber-800',
-  blue: 'bg-sky-100 text-sky-800',
+  neutral: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300',
+  green: 'bg-brand-100 dark:bg-brand-900/60 text-brand-800 dark:text-brand-300',
+  red: 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200',
+  amber: 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200',
+  blue: 'bg-sky-100 dark:bg-sky-900/40 text-sky-800 dark:text-sky-200',
 } as const
 
 export function Badge({

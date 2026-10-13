@@ -20,7 +20,7 @@ export function Logo({ light = false }: { light?: boolean }) {
         />
       </svg>
       <span
-        className={`text-lg font-bold tracking-tight ${light ? 'text-white' : 'text-slate-900'}`}
+        className={`text-lg font-bold tracking-tight ${light ? 'text-white' : 'text-slate-900 dark:text-slate-100'}`}
       >
         Ecofintech
       </span>

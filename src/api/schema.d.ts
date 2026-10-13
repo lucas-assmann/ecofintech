@@ -160,6 +160,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/transactions/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Resumo de entradas e saídas do usuário logado no período (dashboard) */
+        get: operations["TransactionsController_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/transactions/all": {
         parameters: {
             query?: never;
@@ -205,6 +222,40 @@ export interface paths {
         put?: never;
         /** Faz login e devolve o token de acesso */
         post: operations["AuthController_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/forgot-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Envia por e-mail um link para redefinir a senha (resposta igual exista ou não o e-mail) */
+        post: operations["AuthController_forgotPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Define a nova senha usando o token do e-mail (encerra todas as sessões) */
+        post: operations["AuthController_resetPassword"];
         delete?: never;
         options?: never;
         head?: never;
@@ -528,6 +579,55 @@ export interface components {
              */
             reason?: string;
         };
+        SummaryBucket: {
+            /**
+             * @description Primeiro dia do intervalo (horário de Brasília)
+             * @example 2026-10-13
+             */
+            date: string;
+            /** @example 150.00 */
+            entradas: string;
+            /** @example 40.00 */
+            saidas: string;
+        };
+        SummaryCategory: {
+            category: components["schemas"]["transaction_category"];
+            type: components["schemas"]["transaction_type"];
+            /** @example 120.00 */
+            total: string;
+            /** @description Quantidade de lançamentos */
+            count: number;
+        };
+        TransactionSummary: {
+            /**
+             * @description Tamanho de cada intervalo do gráfico: dia (7 e 30 dias) ou semana (90 dias)
+             * @enum {string}
+             */
+            bucket: "day" | "week";
+            /**
+             * @description Primeiro dia do período (horário de Brasília)
+             * @example 2026-09-14
+             */
+            from: string;
+            /**
+             * @description Último dia do período (hoje, horário de Brasília)
+             * @example 2026-10-13
+             */
+            to: string;
+            /** @example 350.00 */
+            total_entradas: string;
+            /** @example 120.00 */
+            total_saidas: string;
+            /**
+             * @description Entradas menos saídas (pode ser negativo)
+             * @example 230.00
+             */
+            resultado: string;
+            /** @description Um item por intervalo, inclusive os sem movimentação (valores zerados) */
+            series: components["schemas"]["SummaryBucket"][];
+            /** @description Totais por categoria e tipo, do maior para o menor */
+            by_category: components["schemas"]["SummaryCategory"][];
+        };
         AdminTransaction: {
             /** @description entrada (dinheiro chegou) ou saida (dinheiro saiu) */
             type: components["schemas"]["transaction_type"];
@@ -574,6 +674,29 @@ export interface components {
              * @example 3600
              */
             expires_in: number;
+        };
+        ForgotPasswordDto: {
+            /**
+             * Format: email
+             * @example maria@email.com
+             */
+            email: string;
+        };
+        MessageResponseDto: {
+            /** @example Se o e-mail estiver cadastrado, enviamos um link para redefinir a senha. */
+            message: string;
+        };
+        ResetPasswordDto: {
+            /**
+             * @description Token recebido no link do e-mail
+             * @example q3Jt0sX8m2...
+             */
+            token: string;
+            /**
+             * @description Nova senha (mínimo 8 caracteres)
+             * @example novaSenha456
+             */
+            new_password: string;
         };
         CreateDeactivationRequestDto: {
             /**
@@ -1077,6 +1200,35 @@ export interface operations {
             };
         };
     };
+    TransactionsController_summary: {
+        parameters: {
+            query: {
+                /** @description Período em dias, contando hoje (7, 30 ou 90) */
+                days: 7 | 30 | 90;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionSummary"];
+                };
+            };
+            /** @description Período inválido (use 7, 30 ou 90) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     TransactionsController_findAllAdmin: {
         parameters: {
             query: {
@@ -1181,6 +1333,58 @@ export interface operations {
             };
             /** @description Conta desativada */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_forgotPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForgotPasswordDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageResponseDto"];
+                };
+            };
+        };
+    };
+    AuthController_resetPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetPasswordDto"];
+            };
+        };
+        responses: {
+            /** @description Senha alterada */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Link inválido, expirado ou já usado */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

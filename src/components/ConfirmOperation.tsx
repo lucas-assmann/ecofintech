@@ -12,9 +12,9 @@ import { CheckIcon } from './icons'
 
 function Summary({ values }: { values: MoneyOperationValues }) {
   return (
-    <dl className="space-y-3 rounded-2xl bg-slate-50 p-4 text-sm">
+    <dl className="space-y-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 p-4 text-sm">
       <div className="flex justify-between gap-4">
-        <dt className="text-slate-500">Para</dt>
+        <dt className="text-slate-500 dark:text-slate-400">Para</dt>
         <dd className="text-right font-medium break-all">
           {values.mode === 'cpf'
             ? `CPF ${formatCpf(values.recipient)}`
@@ -23,13 +23,13 @@ function Summary({ values }: { values: MoneyOperationValues }) {
       </div>
       {values.description && (
         <div className="flex justify-between gap-4">
-          <dt className="text-slate-500">Descrição</dt>
+          <dt className="text-slate-500 dark:text-slate-400">Descrição</dt>
           <dd className="text-right font-medium">{values.description}</dd>
         </div>
       )}
-      <div className="flex items-baseline justify-between gap-4 border-t border-slate-200 pt-3">
-        <dt className="text-slate-500">Valor</dt>
-        <dd className="tabular text-2xl font-bold text-slate-900">
+      <div className="flex items-baseline justify-between gap-4 border-t border-slate-200 dark:border-slate-800 pt-3">
+        <dt className="text-slate-500 dark:text-slate-400">Valor</dt>
+        <dd className="tabular text-2xl font-bold text-slate-900 dark:text-slate-100">
           {formatMoney(values.amount)}
         </dd>
       </div>
@@ -117,18 +117,18 @@ export function OperationReceipt({
 }) {
   return (
     <div className="space-y-5 text-center">
-      <span className="mx-auto grid size-14 place-items-center rounded-full bg-brand-100 text-brand-700">
+      <span className="mx-auto grid size-14 place-items-center rounded-full bg-brand-100 dark:bg-brand-900/60 text-brand-700 dark:text-brand-400">
         <CheckIcon className="size-7" />
       </span>
       <div>
         <h2 className="text-xl font-semibold">{title}</h2>
         <p className="tabular mt-2 text-3xl font-bold">{formatMoney(result.amount)}</p>
-        <p className="mt-1 text-sm text-slate-500">{formatDateTime(result.created_at)}</p>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{formatDateTime(result.created_at)}</p>
       </div>
       <div className="text-left">
         <Summary values={values} />
       </div>
-      <p className="text-xs break-all text-slate-500">
+      <p className="text-xs break-all text-slate-500 dark:text-slate-400">
         Código da movimentação: <span className="font-mono">{result.id}</span>
       </p>
       <Button onClick={onNew} variant="secondary" full>

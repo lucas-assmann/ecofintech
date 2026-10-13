@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Logo } from '../../components/Logo'
+import { ThemeToggle } from '../../components/ThemeToggle'
 
 /** Tela dividida: painel da marca à esquerda (desktop) e formulário à direita. */
 export function AuthLayout({
@@ -37,15 +38,16 @@ export function AuthLayout({
         />
       </aside>
 
-      <main className="flex items-center justify-center px-4 py-10 sm:px-8">
+      <main className="relative flex items-center justify-center px-4 py-10 sm:px-8">
+        <ThemeToggle className="absolute top-4 right-4" />
         <div className="w-full max-w-md">
           <div className="mb-8 lg:hidden">
             <Logo />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
             {title}
           </h1>
-          <p className="mt-2 text-slate-500">{subtitle}</p>
+          <p className="mt-2 text-slate-500 dark:text-slate-400">{subtitle}</p>
           <div className="mt-8">{children}</div>
         </div>
       </main>

@@ -6,6 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#047857" />
     <title>Ecofintech</title>
+    <script>
+      // Aplica o tema antes de desenhar a página (evita piscar branco no escuro).
+      // Sem escolha salva, segue o tema do sistema. Mesma regra de src/lib/theme.ts.
+      try {
+        var saved = localStorage.getItem('ecofintech.theme')
+        var dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches
+        document.documentElement.classList.toggle('dark', dark)
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

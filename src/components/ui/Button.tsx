@@ -5,10 +5,13 @@ const variants = {
   primary:
     'bg-brand-700 text-white hover:bg-brand-800 focus-visible:outline-brand-700',
   secondary:
-    'bg-white text-slate-800 ring-1 ring-slate-300 hover:bg-slate-50 focus-visible:outline-slate-500',
+    'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 ring-1 ring-slate-300 dark:ring-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/60 focus-visible:outline-slate-500',
   danger:
     'bg-red-600 text-white hover:bg-red-700 focus-visible:outline-red-600',
-  ghost: 'text-slate-700 hover:bg-slate-100 focus-visible:outline-slate-500',
+  ghost: 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:outline-slate-500',
+  // Ação destrutiva discreta (ex.: "Remover" numa linha de tabela)
+  'danger-ghost':
+    'text-red-700 hover:bg-red-50 focus-visible:outline-red-600 dark:text-red-400 dark:hover:bg-red-950/40',
 } as const
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

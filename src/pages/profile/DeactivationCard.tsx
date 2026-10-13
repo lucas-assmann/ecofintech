@@ -69,7 +69,7 @@ export function DeactivationCard() {
           )}
 
           {!pending && balance > 0 && (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
               Você ainda tem {formatMoney(balance)} na conta. Para o encerramento
               ser aprovado, transfira todo o saldo antes.
             </p>
@@ -77,7 +77,7 @@ export function DeactivationCard() {
 
           <div className="flex items-center justify-between gap-4">
             {last && (
-              <span className="text-sm text-slate-500">
+              <span className="text-sm text-slate-500 dark:text-slate-400">
                 Situação:{' '}
                 <Badge tone={pending ? 'amber' : last.status === 'rejected' ? 'red' : 'green'}>
                   {pending ? 'Em análise' : last.status === 'rejected' ? 'Recusada' : 'Aprovada'}
@@ -101,7 +101,7 @@ export function DeactivationCard() {
 
       <Modal open={open} onClose={() => setOpen(false)} title="Solicitar encerramento da conta">
         <div className="space-y-4">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             Sua solicitação será enviada ao suporte. Enquanto ela estiver em
             análise, a conta continua funcionando normalmente.
           </p>

@@ -65,13 +65,13 @@ export function AdminDeactivationsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Solicitações de desativação"
         description="Aprovar desativa a conta (exige saldo zerado). Recusar mantém a conta ativa."
       />
 
-      <div role="tablist" aria-label="Situação" className="mb-4 inline-flex rounded-xl bg-slate-200/70 p-1">
+      <div role="tablist" aria-label="Situação" className="mb-4 inline-flex rounded-xl bg-slate-200/70 dark:bg-slate-800 p-1">
         {tabs.map((tab) => (
           <button
             key={tab.status}
@@ -83,7 +83,7 @@ export function AdminDeactivationsPage() {
               setFeedback(null)
             }}
             className={`rounded-lg px-4 py-1.5 text-sm font-medium ${
-              status === tab.status ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              status === tab.status ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             {tab.label}
@@ -110,18 +110,18 @@ export function AdminDeactivationsPage() {
               <Card>
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="font-semibold text-slate-900">{r.user.name}</p>
-                    <p className="text-sm text-slate-500">{r.user.email}</p>
-                    <p className="mt-2 text-sm text-slate-500">
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">{r.user.name}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{r.user.email}</p>
+                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                       Solicitado em {formatDateTime(r.requested_at)}
                     </p>
                     {r.reason && (
-                      <p className="mt-2 text-sm text-slate-700">
-                        <span className="text-slate-500">Motivo:</span> {r.reason}
+                      <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
+                        <span className="text-slate-500 dark:text-slate-400">Motivo:</span> {r.reason}
                       </p>
                     )}
                     {r.reviewed_at && (
-                      <p className="mt-2 text-sm text-slate-500">
+                      <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                         Avaliado em {formatDateTime(r.reviewed_at)}
                         {r.review_note ? ` · ${r.review_note}` : ''}
                       </p>
@@ -155,7 +155,7 @@ export function AdminDeactivationsPage() {
       >
         {review && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
               {review.action === 'approve'
                 ? `A conta de ${review.request.user.name} será desativada: as sessões abertas caem, o login é bloqueado e ela não recebe mais transferências. O histórico é mantido.`
                 : `A conta de ${review.request.user.name} continua ativa. O cliente pode solicitar de novo depois.`}

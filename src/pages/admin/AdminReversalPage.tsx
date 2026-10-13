@@ -111,23 +111,23 @@ export function AdminReversalPage() {
         <Card title="Confirmar estorno">
           <dl className="space-y-3 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-slate-500">Movimentação</dt>
+              <dt className="text-slate-500 dark:text-slate-400">Movimentação</dt>
               <dd className="text-right font-medium">
                 {describeTransaction(found)}{' '}
                 {found.category === 'estorno' && <Badge tone="amber">Estorno</Badge>}
               </dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-slate-500">Valor</dt>
+              <dt className="text-slate-500 dark:text-slate-400">Valor</dt>
               <dd className="tabular font-semibold">{formatMoney(found.amount)}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-slate-500">Data</dt>
+              <dt className="text-slate-500 dark:text-slate-400">Data</dt>
               <dd>{formatDateTime(found.created_at)}</dd>
             </div>
             {found.counterparty && (
               <div className="flex justify-between gap-4">
-                <dt className="text-slate-500">Contraparte</dt>
+                <dt className="text-slate-500 dark:text-slate-400">Contraparte</dt>
                 <dd className="text-right">{found.counterparty.name}</dd>
               </div>
             )}

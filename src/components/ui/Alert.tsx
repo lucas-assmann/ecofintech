@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
 
 const styles = {
-  error: 'bg-red-50 text-red-800 ring-red-200',
-  success: 'bg-brand-50 text-brand-900 ring-brand-200',
-  info: 'bg-sky-50 text-sky-900 ring-sky-200',
-  warning: 'bg-amber-50 text-amber-900 ring-amber-200',
+  error: 'bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200 ring-red-200 dark:ring-red-900',
+  success: 'bg-brand-50 dark:bg-brand-950/60 text-brand-900 dark:text-brand-200 ring-brand-200 dark:ring-brand-900',
+  info: 'bg-sky-50 dark:bg-sky-950/40 text-sky-900 dark:text-sky-100 ring-sky-200 dark:ring-sky-900',
+  warning: 'bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100 ring-amber-200 dark:ring-amber-900',
 } as const
 
 export function Alert({

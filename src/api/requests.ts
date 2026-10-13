@@ -10,6 +10,14 @@ export const logout = async () => unwrap(await api.POST('/auth/logout'))
 
 export const getMe = async () => unwrap(await api.GET('/auth/me'))
 
+/** Pede o e-mail com o link de redefinição (resposta igual exista ou não a conta). */
+export const forgotPassword = async (body: Schemas['ForgotPasswordDto']) =>
+  unwrap(await api.POST('/auth/forgot-password', { body }))
+
+/** Nova senha usando o token do link do e-mail. */
+export const resetPassword = async (body: Schemas['ResetPasswordDto']) =>
+  unwrap(await api.POST('/auth/reset-password', { body }))
+
 // ---------- Usuários ----------
 
 export const register = async (body: Schemas['CreateUserDto']) =>
@@ -41,6 +49,12 @@ export const listTransactions = async (query: {
   limit: number
   offset: number
 }) => unwrap(await api.GET('/transactions', { params: { query } }))
+
+export type SummaryDays = 7 | 30 | 90
+
+/** Totais de entradas e saídas do período, para o dashboard. */
+export const getSummary = async (days: SummaryDays) =>
+  unwrap(await api.GET('/transactions/summary', { params: { query: { days } } }))
 
 type ListAllQuery =
   operations['TransactionsController_findAllAdmin']['parameters']['query']

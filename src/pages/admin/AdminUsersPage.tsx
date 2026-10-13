@@ -82,9 +82,9 @@ export function AdminUsersPage() {
         ) : filtered.length === 0 ? (
           <EmptyState title="Nenhum usuário encontrado" />
         ) : (
-          <div className="-mx-5 overflow-x-auto sm:-mx-6">
+          <div className="relative -mx-5 overflow-x-auto sm:-mx-6">
             <table className="w-full min-w-[44rem] text-left text-sm">
-              <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+              <thead className="border-b border-slate-200 dark:border-slate-800 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 <tr>
                   <th scope="col" className="px-5 py-3 font-semibold sm:px-6">Cliente</th>
                   <th scope="col" className="px-3 py-3 font-semibold">CPF</th>
@@ -94,15 +94,15 @@ export function AdminUsersPage() {
                   <th scope="col" className="px-5 py-3 sm:px-6"><span className="sr-only">Ações</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filtered.map((u) => (
                   <tr key={u.id}>
                     <td className="px-5 py-3 sm:px-6">
-                      <p className="font-medium text-slate-900">
+                      <p className="font-medium text-slate-900 dark:text-slate-100">
                         {u.name}{' '}
                         {u.role === 'admin' && <Badge tone="blue">Admin</Badge>}
                       </p>
-                      <p className="text-slate-500">{u.email}</p>
+                      <p className="text-slate-500 dark:text-slate-400">{u.email}</p>
                     </td>
                     <td className="tabular px-3 py-3 whitespace-nowrap">{formatCpf(u.cpf)}</td>
                     <td className="tabular px-3 py-3 whitespace-nowrap">{formatPhone(u.phone)}</td>
@@ -113,12 +113,11 @@ export function AdminUsersPage() {
                         <Badge tone="red">Desativada</Badge>
                       )}
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap text-slate-500">{formatDate(u.created_at)}</td>
+                    <td className="px-3 py-3 whitespace-nowrap text-slate-500 dark:text-slate-400">{formatDate(u.created_at)}</td>
                     <td className="px-5 py-3 text-right sm:px-6">
                       {u.id !== me?.id && (
                         <Button
-                          variant="ghost"
-                          className="text-red-700 hover:bg-red-50"
+                          variant="danger-ghost"
                           onClick={() => {
                             setFeedback(null)
                             setToRemove(u)
@@ -139,7 +138,7 @@ export function AdminUsersPage() {
       <Modal open={toRemove !== null} onClose={() => setToRemove(null)} title="Remover usuário">
         {toRemove && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
               Remover <strong>{toRemove.name}</strong> ({toRemove.email})? A ação
               fica registrada na auditoria. Usuários com movimentações não podem
               ser removidos; nesse caso, use a desativação.

@@ -75,7 +75,7 @@ export function RegisterPage() {
       subtitle={
         <>
           Já tem conta?{' '}
-          <Link to="/login" className="font-semibold text-brand-700 hover:underline">
+          <Link to="/login" className="font-semibold text-brand-700 dark:text-brand-400 hover:underline">
             Entrar
           </Link>
         </>

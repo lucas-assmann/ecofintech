@@ -29,7 +29,7 @@ export function Loading({ label = 'Carregando...' }: { label?: string }) {
   return (
     <div
       role="status"
-      className="flex items-center justify-center gap-3 py-16 text-slate-500"
+      className="flex items-center justify-center gap-3 py-16 text-slate-500 dark:text-slate-400"
     >
       <Spinner />
       <span>{label}</span>

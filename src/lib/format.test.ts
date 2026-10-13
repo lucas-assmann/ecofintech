@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addDays,
   formatCpf,
+  formatDayMonth,
   formatMoney,
   formatPhone,
   formatPlainDate,
@@ -53,5 +55,15 @@ describe('isValidCpf', () => {
   it('recusa dígito errado e sequências repetidas', () => {
     expect(isValidCpf('529.982.247-24')).toBe(false)
     expect(isValidCpf('111.111.111-11')).toBe(false)
+  })
+})
+
+describe('datas do gráfico', () => {
+  it('mostra dia/mês sem mudar o dia por causa do fuso', () => {
+    expect(formatDayMonth('2026-10-01')).toBe('01/10')
+  })
+
+  it('soma dias atravessando o mês', () => {
+    expect(addDays('2026-09-28', 6)).toBe('2026-10-04')
   })
 })

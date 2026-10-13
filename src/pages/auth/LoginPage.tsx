@@ -47,7 +47,7 @@ export function LoginPage() {
           Ainda não tem conta?{' '}
           <Link
             to="/cadastro"
-            className="font-semibold text-brand-700 hover:underline"
+            className="font-semibold text-brand-700 dark:text-brand-400 hover:underline"
           >
             Abra a sua
           </Link>
@@ -70,16 +70,26 @@ export function LoginPage() {
           )}
         </Field>
 
-        <Field label="Senha" error={errors.password?.message}>
-          {(a11y) => (
-            <Input
-              {...a11y}
-              type="password"
-              autoComplete="current-password"
-              {...register('password')}
-            />
-          )}
-        </Field>
+        <div className="space-y-2">
+          <Field label="Senha" error={errors.password?.message}>
+            {(a11y) => (
+              <Input
+                {...a11y}
+                type="password"
+                autoComplete="current-password"
+                {...register('password')}
+              />
+            )}
+          </Field>
+          <div className="text-right">
+            <Link
+              to="/esqueci-senha"
+              className="text-sm font-semibold text-brand-700 hover:underline dark:text-brand-400"
+            >
+              Esqueci minha senha
+            </Link>
+          </div>
+        </div>
 
         <Button type="submit" full loading={isSubmitting}>
           Entrar

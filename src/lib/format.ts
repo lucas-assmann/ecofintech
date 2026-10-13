@@ -63,3 +63,28 @@ export function formatPhone(value: string): string {
 export function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name
 }
+
+const brlCompact = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+  notation: 'compact',
+  maximumFractionDigits: 1,
+})
+
+/** Valor resumido para eixos de gráfico: 1500 → "R$ 1,5 mil" */
+export function formatMoneyCompact(value: number): string {
+  return brlCompact.format(value)
+}
+
+/** Dia sem horário vindo da API ("2026-10-13") → "13/10", sem conversão de fuso */
+export function formatDayMonth(date: string): string {
+  const [, month, day] = date.split('-')
+  return `${day}/${month}`
+}
+
+/** Soma dias a uma data sem horário: ("2026-10-13", 6) → "2026-10-19" */
+export function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}

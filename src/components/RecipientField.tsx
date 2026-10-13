@@ -26,7 +26,7 @@ export function RecipientField({
       <div
         role="radiogroup"
         aria-label="Identificar destinatário por"
-        className="inline-flex rounded-xl bg-slate-100 p-1"
+        className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1"
       >
         {(['email', 'cpf'] as const).map((option) => (
           <button
@@ -40,8 +40,8 @@ export function RecipientField({
             }}
             className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${
               mode === option
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             {option === 'email' ? 'E-mail' : 'CPF'}

@@ -13,6 +13,8 @@ import { AdminDeactivationsPage } from './pages/admin/AdminDeactivationsPage'
 import { AdminReversalPage } from './pages/admin/AdminReversalPage'
 import { AdminTransactionsPage } from './pages/admin/AdminTransactionsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage'
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage'
 
 export function App() {
   return (
@@ -21,7 +23,11 @@ export function App() {
       <Route element={<GuestOnly />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/cadastro" element={<RegisterPage />} />
+        <Route path="/esqueci-senha" element={<ForgotPasswordPage />} />
       </Route>
+
+      {/* Aberta pelo link do e-mail, mesmo por quem ainda está logado neste navegador */}
+      <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
 
       {/* Exigem login */}
       <Route element={<RequireAuth />}>

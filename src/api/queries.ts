@@ -7,6 +7,9 @@ export const queryKeys = {
   transactions: ['transactions'] as const,
   transactionsPage: (limit: number, offset: number) =>
     ['transactions', limit, offset] as const,
+  // Começa com 'transactions': invalidar o extrato (após uma transferência)
+  // também atualiza o resumo do dashboard
+  summary: (days: number) => ['transactions', 'summary', days] as const,
   myDeactivation: ['deactivation', 'me'] as const,
   users: ['admin', 'users'] as const,
   deactivations: (status?: string) =>
@@ -27,6 +30,14 @@ export const useTransactions = (limit: number, offset = 0) =>
     queryKey: queryKeys.transactionsPage(limit, offset),
     queryFn: () => requests.listTransactions({ limit, offset }),
     // Mantém a página anterior na tela enquanto carrega a próxima
+    placeholderData: keepPreviousData,
+  })
+
+export const useSummary = (days: requests.SummaryDays) =>
+  useQuery({
+    queryKey: queryKeys.summary(days),
+    queryFn: () => requests.getSummary(days),
+    // Ao trocar o período, o gráfico anterior fica na tela até o novo chegar
     placeholderData: keepPreviousData,
   })
 

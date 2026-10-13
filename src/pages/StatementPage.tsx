@@ -17,7 +17,7 @@ export function StatementPage() {
   const hasNext = (query.data?.length ?? 0) > PAGE_SIZE
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Extrato"
         description="Todas as entradas e saídas da sua conta, das mais recentes para as mais antigas."
@@ -36,7 +36,7 @@ export function StatementPage() {
         )}
 
         {(page > 0 || hasNext) && (
-          <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+          <div className="mt-4 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-4">
             <Button
               variant="secondary"
               onClick={() => setPage((p) => p - 1)}
@@ -44,7 +44,7 @@ export function StatementPage() {
             >
               Anteriores
             </Button>
-            <span className="text-sm text-slate-500">Página {page + 1}</span>
+            <span className="text-sm text-slate-500 dark:text-slate-400">Página {page + 1}</span>
             <Button
               variant="secondary"
               onClick={() => setPage((p) => p + 1)}

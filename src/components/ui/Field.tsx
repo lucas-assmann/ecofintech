@@ -7,7 +7,7 @@ import {
 } from 'react'
 
 export const inputClass =
-  'block w-full min-h-11 rounded-xl border-0 bg-white px-3.5 text-slate-900 ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-brand-600 focus:outline-none disabled:bg-slate-100 disabled:text-slate-500 aria-invalid:ring-red-500'
+  'block w-full min-h-11 rounded-xl border-0 bg-white dark:bg-slate-900 px-3.5 text-slate-900 dark:text-slate-100 ring-1 ring-slate-300 dark:ring-slate-700 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-brand-600 focus:outline-none disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-500 dark:disabled:text-slate-400 aria-invalid:ring-red-500'
 
 interface FieldProps {
   label: string
@@ -27,7 +27,7 @@ export function Field({ label, error, hint, children }: FieldProps) {
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700">
+      <label htmlFor={id} className="block text-sm font-medium text-slate-700 dark:text-slate-300">
         {label}
       </label>
       {children({
@@ -36,12 +36,12 @@ export function Field({ label, error, hint, children }: FieldProps) {
         'aria-describedby': describedBy,
       })}
       {error ? (
-        <p id={`${id}-error`} className="text-sm text-red-600">
+        <p id={`${id}-error`} className="text-sm text-red-600 dark:text-red-400">
           {error}
         </p>
       ) : (
         hint && (
-          <p id={`${id}-hint`} className="text-sm text-slate-500">
+          <p id={`${id}-hint`} className="text-sm text-slate-500 dark:text-slate-400">
             {hint}
           </p>
         )

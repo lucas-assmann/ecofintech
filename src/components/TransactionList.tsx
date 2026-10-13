@@ -12,7 +12,7 @@ function TransactionIcon({ t }: { t: Transaction }) {
   return (
     <span
       className={`grid size-10 shrink-0 place-items-center rounded-full ${
-        isIncoming(t) ? 'bg-brand-50 text-brand-700' : 'bg-slate-100 text-slate-600'
+        isIncoming(t) ? 'bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-brand-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
       }`}
     >
       <Icon />
@@ -23,7 +23,7 @@ function TransactionIcon({ t }: { t: Transaction }) {
 function Amount({ t, className = '' }: { t: Transaction; className?: string }) {
   return (
     <span
-      className={`tabular font-semibold ${isIncoming(t) ? 'text-brand-700' : 'text-slate-900'} ${className}`}
+      className={`tabular font-semibold ${isIncoming(t) ? 'text-brand-700 dark:text-brand-400' : 'text-slate-900 dark:text-slate-100'} ${className}`}
     >
       {isIncoming(t) ? '+ ' : '− '}
       {formatMoney(t.amount)}
@@ -48,22 +48,22 @@ export function TransactionList({ items, action }: TransactionListProps) {
 
   return (
     <>
-      <ul className="-mx-2 divide-y divide-slate-100">
+      <ul className="-mx-2 divide-y divide-slate-100 dark:divide-slate-800">
         {items.map((t) => (
           <li key={t.id}>
             <button
               type="button"
               onClick={() => setSelected(t)}
-              className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left hover:bg-slate-50"
+              className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60"
             >
               <TransactionIcon t={t} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium text-slate-900">
+                <span className="block truncate font-medium text-slate-900 dark:text-slate-100">
                   {describeTransaction(t)}
                 </span>
-                <span className="block truncate text-sm text-slate-500">
+                <span className="block truncate text-sm text-slate-500 dark:text-slate-400">
                   {ownerOf(t) && (
-                    <span className="font-medium text-slate-700">{ownerOf(t)?.name} · </span>
+                    <span className="font-medium text-slate-700 dark:text-slate-300">{ownerOf(t)?.name} · </span>
                   )}
                   {formatDateTime(t.created_at)}
                   {t.description ? ` · ${t.description}` : ''}
@@ -118,14 +118,14 @@ function TransactionDetails({ t }: { t: Item }) {
       <dl className="space-y-3 text-sm">
         {rows.map(([label, value]) => (
           <div key={label} className="flex justify-between gap-4">
-            <dt className="text-slate-500">{label}</dt>
-            <dd className="text-right font-medium text-slate-900">{value}</dd>
+            <dt className="text-slate-500 dark:text-slate-400">{label}</dt>
+            <dd className="text-right font-medium text-slate-900 dark:text-slate-100">{value}</dd>
           </div>
         ))}
-        <div className="border-t border-slate-100 pt-3">
-          <dt className="text-slate-500">Código da movimentação</dt>
-          <dd className="mt-1 font-mono text-xs break-all text-slate-700">{t.id}</dd>
-          <dd className="mt-1 text-xs text-slate-500">
+        <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+          <dt className="text-slate-500 dark:text-slate-400">Código da movimentação</dt>
+          <dd className="mt-1 font-mono text-xs break-all text-slate-700 dark:text-slate-300">{t.id}</dd>
+          <dd className="mt-1 text-xs text-slate-500 dark:text-slate-400">
             Informe este código ao suporte se precisar contestar a movimentação.
           </dd>
         </div>
