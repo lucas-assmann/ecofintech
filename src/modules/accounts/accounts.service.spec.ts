@@ -28,15 +28,19 @@ describe('AccountsService', () => {
       updated_at: new Date(),
     });
 
-    const account = await service.findByUser('user-1');
+    const account = await service.findById('acc-1');
+
+    expect(prisma.accounts.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'acc-1' } }),
+    );
 
     expect(account.balance).toBe('200.00');
   });
 
-  it('lança NotFound quando o usuário não tem conta', async () => {
+  it('lança NotFound quando a conta não existe', async () => {
     prisma.accounts.findUnique.mockResolvedValue(null);
 
-    await expect(service.findByUser('user-1')).rejects.toBeInstanceOf(
+    await expect(service.findById('acc-1')).rejects.toBeInstanceOf(
       NotFoundException,
     );
   });

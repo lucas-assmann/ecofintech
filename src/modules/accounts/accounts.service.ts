@@ -6,9 +6,9 @@ import { Account } from './entities/account.entity.js';
 export class AccountsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findByUser(user_id: string): Promise<Account> {
+  async findById(account_id: string): Promise<Account> {
     const account = await this.prisma.accounts.findUnique({
-      where: { user_id },
+      where: { id: account_id },
       select: { id: true, balance: true, created_at: true, updated_at: true },
     });
     if (!account) throw new NotFoundException('Conta não encontrada');

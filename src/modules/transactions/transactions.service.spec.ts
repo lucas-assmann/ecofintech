@@ -146,28 +146,45 @@ describe('TransactionsService', () => {
     it('mesma chave e mesmos dados: devolve o original sem mover dinheiro', async () => {
       prisma.idempotency_keys.findUnique.mockResolvedValue({
         endpoint: 'transfer',
-        request_hash: await hashOf(dto),
+        request_hash: await hashOf({ ...dto, from_account_id: 'acc-a' }),
         transaction_id: 'tx-1',
       });
       prisma.transactions.findUniqueOrThrow.mockResolvedValue(entry());
 
-      const result = await service.transfer('user-a', KEY, dto);
+      const result = await service.transfer('user-a', 'acc-a', KEY, dto);
 
       expect(result.replayed).toBe(true);
       expect(result.transaction.id).toBe('tx-1');
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
-    it('mesma chave com dados diferentes: 422', async () => {
+    it('mesma chave e mesmos dados, mas de outra conta: 422 (nunca devolve a operação da outra conta)', async () => {
       prisma.idempotency_keys.findUnique.mockResolvedValue({
         endpoint: 'transfer',
-        request_hash: await hashOf({ ...dto, amount: 999 }),
+        request_hash: await hashOf({ ...dto, from_account_id: 'acc-a' }),
         transaction_id: 'tx-1',
       });
 
-      await expect(service.transfer('user-a', KEY, dto)).rejects.toBeInstanceOf(
-        UnprocessableEntityException,
-      );
+      await expect(
+        service.transfer('user-a', 'acc-empresa', KEY, dto),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+      expect(prisma.transactions.findUniqueOrThrow).not.toHaveBeenCalled();
+    });
+
+    it('mesma chave com dados diferentes: 422', async () => {
+      prisma.idempotency_keys.findUnique.mockResolvedValue({
+        endpoint: 'transfer',
+        request_hash: await hashOf({
+          ...dto,
+          amount: 999,
+          from_account_id: 'acc-a',
+        }),
+        transaction_id: 'tx-1',
+      });
+
+      await expect(
+        service.transfer('user-a', 'acc-a', KEY, dto),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
     });
 
     it('requisição repetida em paralelo: a segunda devolve o resultado da primeira', async () => {
@@ -176,13 +193,13 @@ describe('TransactionsService', () => {
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({
           endpoint: 'transfer',
-          request_hash: await hashOf(dto),
+          request_hash: await hashOf({ ...dto, from_account_id: 'acc-a' }),
           transaction_id: 'tx-1',
         });
       prisma.$transaction.mockRejectedValue(prismaError('P2002'));
       prisma.transactions.findUniqueOrThrow.mockResolvedValue(entry());
 
-      const result = await service.transfer('user-a', KEY, dto);
+      const result = await service.transfer('user-a', 'acc-a', KEY, dto);
 
       expect(result.replayed).toBe(true);
     });
@@ -195,10 +212,34 @@ describe('TransactionsService', () => {
       sender('acc-a');
       recipient('acc-a');
 
-      await expect(service.transfer('user-a', KEY, dto)).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.transfer('user-a', 'acc-a', KEY, dto),
+      ).rejects.toBeInstanceOf(BadRequestException);
       expect(tx.accounts.update).not.toHaveBeenCalled();
+    });
+
+    it('debita a conta ativa recebida (não procura a conta pessoal do usuário)', async () => {
+      recipient('acc-b');
+      tx.accounts.update.mockResolvedValue({ balance: D('0') });
+      tx.transactions.create.mockResolvedValue(entry());
+
+      await service.transfer('user-a', 'acc-empresa', KEY, {
+        to_email: 'fulano@email.com',
+        amount: 50,
+      });
+
+      expect(tx.accounts.findUnique).not.toHaveBeenCalled();
+      expect(tx.accounts.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'acc-empresa', balance: { gte: D('50') } },
+        }),
+      );
+      const [outgoing] = createdData(tx.transactions.create);
+      expect(outgoing).toMatchObject({
+        account_id: 'acc-empresa',
+        type: 'saida',
+        created_by: 'user-a',
+      });
     });
 
     it('cria saída e entrada com o mesmo operation_id e o remetente como autor', async () => {
@@ -209,7 +250,7 @@ describe('TransactionsService', () => {
         .mockResolvedValueOnce({ balance: D('50') }); // crédito em acc-b
       tx.transactions.create.mockResolvedValueOnce(entry());
 
-      const result = await service.transfer('user-a', KEY, dto);
+      const result = await service.transfer('user-a', 'acc-a', KEY, dto);
 
       const [outgoing, incoming] = createdData(tx.transactions.create);
       expect(outgoing).toMatchObject({
@@ -240,7 +281,7 @@ describe('TransactionsService', () => {
       tx.accounts.update.mockResolvedValue({ balance: D('0') });
       tx.transactions.create.mockResolvedValue(entry());
 
-      await service.transfer('user-z', KEY, dto);
+      await service.transfer('user-z', 'acc-z', KEY, dto);
 
       const updatedIds = tx.accounts.update.mock.calls.map(
         ([arg]) => (arg as { where: { id: string } }).where.id,
@@ -254,7 +295,7 @@ describe('TransactionsService', () => {
       tx.accounts.update.mockResolvedValue({ balance: D('0') });
       tx.transactions.create.mockResolvedValue(entry());
 
-      await service.transfer('user-a', KEY, {
+      await service.transfer('user-a', 'acc-a', KEY, {
         to_cpf: '52998224725',
         amount: 50,
       });
@@ -274,7 +315,7 @@ describe('TransactionsService', () => {
       sender('acc-a');
 
       await expect(
-        service.transfer('user-a', KEY, body),
+        service.transfer('user-a', 'acc-a', KEY, body),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -282,9 +323,9 @@ describe('TransactionsService', () => {
       sender('acc-a');
       recipient('acc-b', 'deactivated');
 
-      await expect(service.transfer('user-a', KEY, dto)).rejects.toThrow(
-        'Conta de destino desativada',
-      );
+      await expect(
+        service.transfer('user-a', 'acc-a', KEY, dto),
+      ).rejects.toThrow('Conta de destino desativada');
       expect(tx.accounts.update).not.toHaveBeenCalled();
     });
 
@@ -293,9 +334,9 @@ describe('TransactionsService', () => {
       recipient('acc-b');
       tx.accounts.update.mockRejectedValueOnce(prismaError('P2025'));
 
-      await expect(service.transfer('user-a', KEY, dto)).rejects.toThrow(
-        'Saldo insuficiente',
-      );
+      await expect(
+        service.transfer('user-a', 'acc-a', KEY, dto),
+      ).rejects.toThrow('Saldo insuficiente');
       expect(tx.transactions.create).not.toHaveBeenCalled();
     });
   });
@@ -424,12 +465,11 @@ describe('TransactionsService', () => {
   describe('findOne', () => {
     it('usuário comum só vê lançamentos da própria conta', async () => {
       prisma.users.findUnique.mockResolvedValue({ role: 'user' });
-      prisma.accounts.findUnique.mockResolvedValue({ id: 'acc-a' });
       prisma.transactions.findFirst.mockResolvedValue(null);
 
-      await expect(service.findOne('user-a', 'tx-x')).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.findOne('user-a', 'acc-a', 'tx-x'),
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.transactions.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'tx-x', account_id: 'acc-a' } }),
       );
@@ -439,7 +479,7 @@ describe('TransactionsService', () => {
       prisma.users.findUnique.mockResolvedValue({ role: 'admin' });
       prisma.transactions.findFirst.mockResolvedValue(entry());
 
-      await service.findOne('admin-1', 'tx-1');
+      await service.findOne('admin-1', 'acc-admin', 'tx-1');
 
       expect(prisma.transactions.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'tx-1' } }),
@@ -525,7 +565,6 @@ describe('TransactionsService', () => {
     const mockQueries = (
       series: { date: string; entradas: string; saidas: string }[],
     ) => {
-      prisma.accounts.findUnique.mockResolvedValue({ id: 'acc-a' });
       prisma.$queryRaw
         .mockResolvedValueOnce([{ from: '2026-10-07', to: '2026-10-13' }])
         .mockResolvedValueOnce(
@@ -546,7 +585,7 @@ describe('TransactionsService', () => {
         { date: '2026-10-08', entradas: '0', saidas: '150.5' },
       ]);
 
-      const result = await service.summary('user-a', { days: 7 });
+      const result = await service.summary('acc-a', { days: 7 });
 
       expect(result).toMatchObject({
         from: '2026-10-07',
@@ -568,7 +607,7 @@ describe('TransactionsService', () => {
     it('agrupa por semana no período de 90 dias', async () => {
       mockQueries([]);
 
-      const result = await service.summary('user-a', { days: 90 });
+      const result = await service.summary('acc-a', { days: 90 });
 
       expect(result.bucket).toBe('week');
       expect(result.resultado).toBe('0.00');

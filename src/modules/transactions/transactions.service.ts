@@ -104,11 +104,13 @@ export class TransactionsService {
   }
 
   /**
-   * Transfere da conta do usuário logado para a conta de destino (e-mail ou CPF).
+   * Transfere da conta ativa (pessoal ou de empresa) para a conta de destino.
    * Gera dois lançamentos com o mesmo operation_id: saída na origem e entrada no destino.
+   * `user_id` é quem fez a operação (fica em created_by).
    */
   transfer(
     user_id: string,
+    from_account_id: string,
     idempotency_key: string,
     dto: TransferDto,
   ): Promise<OperationResult> {
@@ -116,9 +118,11 @@ export class TransactionsService {
       user_id,
       idempotency_key,
       'transfer',
-      dto,
+      // A conta de origem entra no hash: a mesma chave usada em outra conta
+      // é outra operação (422), nunca devolve o resultado da outra conta
+      Object.assign({}, dto, { from_account_id }),
       async (tx) => {
-        const from = await findAccountIdByUser(tx, user_id);
+        const from = from_account_id;
         const to = await findRecipientAccountId(tx, dto);
         if (from === to) {
           throw new BadRequestException(
@@ -195,7 +199,10 @@ export class TransactionsService {
         amount: true,
         counterparty_account_id: true,
         accounts_transactions_account_idToaccounts: {
-          select: { users: { select: { status: true } } },
+          select: {
+            users: { select: { status: true } },
+            companies: { select: { status: true } },
+          },
         },
       },
     });
@@ -208,10 +215,16 @@ export class TransactionsService {
     if (alreadyReversed > 0) {
       throw new ConflictException('Esta movimentação já foi estornada');
     }
+    // A conta é de uma pessoa ou de uma empresa: vale o status de quem for o dono
+    const ownerStatus = ({
+      users,
+      companies,
+    }: (typeof legs)[number]['accounts_transactions_account_idToaccounts']) =>
+      (users ?? companies)?.status;
     if (
       legs.some(
         (leg) =>
-          leg.accounts_transactions_account_idToaccounts.users.status !==
+          ownerStatus(leg.accounts_transactions_account_idToaccounts) !==
           'active',
       )
     ) {
@@ -266,12 +279,11 @@ export class TransactionsService {
     }
   }
 
-  /** Extrato do usuário logado, do mais recente para o mais antigo. */
+  /** Extrato da conta ativa, do mais recente para o mais antigo. */
   async findAll(
-    user_id: string,
+    account_id: string,
     query: ListTransactionsQueryDto,
   ): Promise<Transaction[]> {
-    const account_id = await findAccountIdByUser(this.prisma, user_id);
     const entries = await this.prisma.transactions.findMany({
       where: { account_id },
       orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
@@ -283,14 +295,13 @@ export class TransactionsService {
   }
 
   /**
-   * Resumo de entradas e saídas da conta do usuário nos últimos `days` dias
+   * Resumo de entradas e saídas da conta ativa nos últimos `days` dias
    * (contando hoje, no horário de Brasília), para o dashboard.
    */
   async summary(
-    user_id: string,
+    account_id: string,
     { days }: SummaryQueryDto,
   ): Promise<TransactionSummary> {
-    const account_id = await findAccountIdByUser(this.prisma, user_id);
     // 7 e 30 dias: uma barra por dia. 90 dias: uma por semana (seriam 90 barras).
     const bucketDays = days === 90 ? 7 : 1;
 
@@ -400,26 +411,37 @@ export class TransactionsService {
       select: {
         ...transactionSelect,
         accounts_transactions_account_idToaccounts: {
-          select: { users: { select: { name: true, email: true } } },
+          select: {
+            users: { select: { name: true, email: true } },
+            companies: { select: { trade_name: true } },
+          },
         },
       },
     });
     return entries.map(
       ({ accounts_transactions_account_idToaccounts: account, ...entry }) =>
-        Object.assign(toTransaction(entry), { owner: account.users }),
+        Object.assign(toTransaction(entry), {
+          // Conta de empresa: o dono é a empresa (sem e-mail próprio)
+          owner: account.users ?? {
+            name: account.companies?.trade_name ?? '',
+            email: '',
+          },
+        }),
     );
   }
 
-  /** Um lançamento: o usuário vê só os da própria conta; o admin vê qualquer um. */
-  async findOne(user_id: string, id: string): Promise<Transaction> {
+  /** Um lançamento: o usuário vê só os da conta ativa; o admin vê qualquer um. */
+  async findOne(
+    user_id: string,
+    account_id: string,
+    id: string,
+  ): Promise<Transaction> {
     const user = await this.prisma.users.findUnique({
       where: { id: user_id },
       select: { role: true },
     });
     const where: Prisma.transactionsWhereInput = { id };
-    if (user?.role !== 'admin') {
-      where.account_id = await findAccountIdByUser(this.prisma, user_id);
-    }
+    if (user?.role !== 'admin') where.account_id = account_id;
     const entry = await this.prisma.transactions.findFirst({
       where,
       select: transactionSelect,
@@ -555,18 +577,6 @@ async function applyMoves(
   return balances;
 }
 
-async function findAccountIdByUser(
-  client: Client,
-  user_id: string,
-): Promise<string> {
-  const account = await client.accounts.findUnique({
-    where: { user_id },
-    select: { id: true },
-  });
-  if (!account) throw new NotFoundException('Conta não encontrada');
-  return account.id;
-}
-
 /** Conta de quem vai receber, identificada por to_email ou to_cpf. */
 async function findRecipientAccountId(
   client: Client,
@@ -586,7 +596,8 @@ async function findRecipientAccountId(
     select: { id: true, users: { select: { status: true } } },
   });
   if (!account) throw new NotFoundException('Destinatário não encontrado');
-  if (account.users.status !== 'active') {
+  // A busca é por e-mail/CPF de uma pessoa: a conta encontrada é pessoal
+  if (account.users!.status !== 'active') {
     throw new UnprocessableEntityException('Conta de destino desativada');
   }
   return account.id;
