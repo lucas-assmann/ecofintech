@@ -1,4 +1,4 @@
-import type { Transaction } from '../api/client'
+import type { AdminTransaction, Transaction } from '../api/client'
 
 /** Título do lançamento para o extrato, do ponto de vista do dono da conta. */
 export function describeTransaction(t: Transaction): string {
@@ -16,3 +16,7 @@ export function describeTransaction(t: Transaction): string {
 }
 
 export const isIncoming = (t: Transaction) => t.type === 'entrada'
+
+/** Dono da conta, quando o lançamento vem da listagem geral do admin. */
+export const ownerOf = (t: Transaction | AdminTransaction) =>
+  'owner' in t ? t.owner : null

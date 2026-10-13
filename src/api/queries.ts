@@ -11,6 +11,12 @@ export const queryKeys = {
   users: ['admin', 'users'] as const,
   deactivations: (status?: string) =>
     ['admin', 'deactivations', status ?? 'all'] as const,
+  adminTransactions: ['admin', 'transactions'] as const,
+  adminTransactionsPage: (
+    filters: requests.AdminTransactionFilters,
+    limit: number,
+    offset: number,
+  ) => ['admin', 'transactions', filters, limit, offset] as const,
 }
 
 export const useAccount = () =>
@@ -21,6 +27,17 @@ export const useTransactions = (limit: number, offset = 0) =>
     queryKey: queryKeys.transactionsPage(limit, offset),
     queryFn: () => requests.listTransactions({ limit, offset }),
     // Mantém a página anterior na tela enquanto carrega a próxima
+    placeholderData: keepPreviousData,
+  })
+
+export const useAdminTransactions = (
+  filters: requests.AdminTransactionFilters,
+  limit: number,
+  offset = 0,
+) =>
+  useQuery({
+    queryKey: queryKeys.adminTransactionsPage(filters, limit, offset),
+    queryFn: () => requests.listAllTransactions({ ...filters, limit, offset }),
     placeholderData: keepPreviousData,
   })
 

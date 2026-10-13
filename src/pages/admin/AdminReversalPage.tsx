@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from 'react'
+import { useLocation } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import type { Transaction } from '../../api/client'
 import { errorMessage } from '../../api/client'
+import { queryKeys } from '../../api/queries'
 import { getTransaction, reverseTransaction } from '../../api/requests'
 import { formatDateTime, formatMoney } from '../../lib/format'
 import { describeTransaction } from '../../lib/transactions'
@@ -13,8 +16,11 @@ import { Field, Input } from '../../components/ui/Field'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function AdminReversalPage() {
-  const [id, setId] = useState('')
-  const [found, setFound] = useState<Transaction | null>(null)
+  const queryClient = useQueryClient()
+  // Vindo da tela de Lançamentos, a movimentação já chega pronta para confirmar
+  const fromList = (useLocation().state as { transaction?: Transaction } | null)?.transaction
+  const [id, setId] = useState(fromList?.id ?? '')
+  const [found, setFound] = useState<Transaction | null>(fromList ?? null)
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,6 +51,8 @@ export function AdminReversalPage() {
     setError(null)
     try {
       setResult(await reverseTransaction(found.id, { reason: reason.trim() || undefined }))
+      // A listagem de lançamentos do admin passa a mostrar o estorno
+      void queryClient.invalidateQueries({ queryKey: queryKeys.adminTransactions })
       setFound(null)
       setReason('')
       setId('')

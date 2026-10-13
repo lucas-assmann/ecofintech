@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
-import type { Transaction } from '../api/client'
+import type { AdminTransaction, Transaction } from '../api/client'
 import { formatDateTime, formatMoney } from '../lib/format'
-import { describeTransaction, isIncoming } from '../lib/transactions'
+import { describeTransaction, isIncoming, ownerOf } from '../lib/transactions'
 import { ArrowDownIcon, ArrowUpIcon, UndoIcon } from './icons'
 import { Badge } from './ui/Badge'
 import { Modal } from './ui/Modal'
@@ -31,9 +31,20 @@ function Amount({ t, className = '' }: { t: Transaction; className?: string }) {
   )
 }
 
-/** Lista do extrato; clicar num lançamento abre os detalhes. */
-export function TransactionList({ items }: { items: Transaction[] }) {
-  const [selected, setSelected] = useState<Transaction | null>(null)
+type Item = Transaction | AdminTransaction
+
+interface TransactionListProps {
+  items: Item[]
+  /** Botão extra nos detalhes (ex.: estornar, na tela do admin) */
+  action?: (t: Item) => ReactNode
+}
+
+/**
+ * Lista do extrato; clicar num lançamento abre os detalhes.
+ * Lançamentos da listagem do admin mostram também o dono da conta.
+ */
+export function TransactionList({ items, action }: TransactionListProps) {
+  const [selected, setSelected] = useState<Item | null>(null)
 
   return (
     <>
@@ -51,6 +62,9 @@ export function TransactionList({ items }: { items: Transaction[] }) {
                   {describeTransaction(t)}
                 </span>
                 <span className="block truncate text-sm text-slate-500">
+                  {ownerOf(t) && (
+                    <span className="font-medium text-slate-700">{ownerOf(t)?.name} · </span>
+                  )}
                   {formatDateTime(t.created_at)}
                   {t.description ? ` · ${t.description}` : ''}
                 </span>
@@ -66,14 +80,21 @@ export function TransactionList({ items }: { items: Transaction[] }) {
         onClose={() => setSelected(null)}
         title="Detalhes da movimentação"
       >
-        {selected && <TransactionDetails t={selected} />}
+        {selected && (
+          <>
+            <TransactionDetails t={selected} />
+            {action && <div className="mt-5">{action(selected)}</div>}
+          </>
+        )}
       </Modal>
     </>
   )
 }
 
-function TransactionDetails({ t }: { t: Transaction }) {
+function TransactionDetails({ t }: { t: Item }) {
+  const owner = ownerOf(t)
   const rows: [string, ReactNode][] = [
+    ...(owner ? [['Conta de', `${owner.name} (${owner.email})`] as [string, ReactNode]] : []),
     ['Tipo', describeTransaction(t)],
     ['Data', formatDateTime(t.created_at)],
     ['Saldo após', <span key="saldo" className="tabular">{formatMoney(t.balance_after)}</span>],

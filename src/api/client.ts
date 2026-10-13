@@ -6,6 +6,7 @@ export type Schemas = components['schemas']
 export type User = Schemas['User']
 export type Account = Schemas['Account']
 export type Transaction = Schemas['Transaction']
+export type AdminTransaction = Schemas['AdminTransaction']
 export type DeactivationRequest = Schemas['DeactivationRequest']
 
 export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'

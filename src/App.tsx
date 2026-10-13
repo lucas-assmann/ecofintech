@@ -11,6 +11,7 @@ import { AdminUsersPage } from './pages/admin/AdminUsersPage'
 import { AdminDepositPage } from './pages/admin/AdminDepositPage'
 import { AdminDeactivationsPage } from './pages/admin/AdminDeactivationsPage'
 import { AdminReversalPage } from './pages/admin/AdminReversalPage'
+import { AdminTransactionsPage } from './pages/admin/AdminTransactionsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
 export function App() {
@@ -36,6 +37,7 @@ export function App() {
             <Route path="usuarios" element={<AdminUsersPage />} />
             <Route path="deposito" element={<AdminDepositPage />} />
             <Route path="desativacoes" element={<AdminDeactivationsPage />} />
+            <Route path="lancamentos" element={<AdminTransactionsPage />} />
             <Route path="estorno" element={<AdminReversalPage />} />
           </Route>
 

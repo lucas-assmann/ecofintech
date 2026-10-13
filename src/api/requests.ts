@@ -1,4 +1,5 @@
 import { api, ApiError, type Schemas, unwrap } from './client'
+import type { operations } from './schema'
 
 // ---------- Auth ----------
 
@@ -40,6 +41,16 @@ export const listTransactions = async (query: {
   limit: number
   offset: number
 }) => unwrap(await api.GET('/transactions', { params: { query } }))
+
+type ListAllQuery =
+  operations['TransactionsController_findAllAdmin']['parameters']['query']
+
+/** Filtros da listagem geral (sem a paginação). */
+export type AdminTransactionFilters = Omit<ListAllQuery, 'limit' | 'offset'>
+
+/** Todos os lançamentos do sistema (admin), com filtros. */
+export const listAllTransactions = async (query: ListAllQuery) =>
+  unwrap(await api.GET('/transactions/all', { params: { query } }))
 
 export const getTransaction = async (id: string) =>
   unwrap(await api.GET('/transactions/{id}', { params: { path: { id } } }))

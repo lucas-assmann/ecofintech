@@ -22,6 +22,7 @@ const adminLinks = [
   { to: '/admin/usuarios', label: 'Usuários' },
   { to: '/admin/deposito', label: 'Depósito' },
   { to: '/admin/desativacoes', label: 'Desativações' },
+  { to: '/admin/lancamentos', label: 'Lançamentos' },
   { to: '/admin/estorno', label: 'Estorno' },
 ]
 

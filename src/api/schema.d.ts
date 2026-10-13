@@ -160,6 +160,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/transactions/all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Todos os lançamentos do sistema, com filtros (somente admin, mais recentes primeiro) */
+        get: operations["TransactionsController_findAllAdmin"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/transactions/{id}": {
         parameters: {
             query?: never;
@@ -510,6 +527,33 @@ export interface components {
              * @example Depósito feito na conta errada
              */
             reason?: string;
+        };
+        AdminTransaction: {
+            /** @description entrada (dinheiro chegou) ou saida (dinheiro saiu) */
+            type: components["schemas"]["transaction_type"];
+            category: components["schemas"]["transaction_category"];
+            /** @example 5b1e7c2d-3a4f-4e6b-8c9d-0a1b2c3d4e5f */
+            id: string;
+            /**
+             * @description Valor em reais (texto com 2 casas)
+             * @example 200.00
+             */
+            amount: string;
+            /**
+             * @description Saldo da conta logo após este lançamento
+             * @example 200.00
+             */
+            balance_after: string;
+            /** @description A outra pessoa da transferência (null em depósitos) */
+            counterparty: components["schemas"]["Counterparty"] | null;
+            /** @example Aluguel */
+            description: string | null;
+            /** @description Em estornos: id do lançamento que foi estornado (null nos demais) */
+            reversal_of: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** @description Dono da conta em que o lançamento foi feito */
+            owner: components["schemas"]["Counterparty"];
         };
         LoginDto: {
             /**
@@ -1030,6 +1074,52 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Transaction"][];
                 };
+            };
+        };
+    };
+    TransactionsController_findAllAdmin: {
+        parameters: {
+            query: {
+                category?: components["schemas"]["transaction_category"];
+                type?: components["schemas"]["transaction_type"];
+                /** @description Busca pelo dono da conta: parte do nome, do e-mail ou do CPF */
+                search?: string;
+                /** @description Data inicial (inclusive), no formato AAAA-MM-DD */
+                from?: string;
+                /** @description Data final (inclusive), no formato AAAA-MM-DD */
+                to?: string;
+                /** @description Quantidade de lançamentos por página */
+                limit: number;
+                /** @description Quantos lançamentos pular (para paginar) */
+                offset: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTransaction"][];
+                };
+            };
+            /** @description Filtro inválido */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Usuário não é admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
