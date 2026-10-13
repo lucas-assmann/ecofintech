@@ -37,6 +37,8 @@ export class UsersService {
           email: dto.email.toLowerCase(),
           date_of_birth: new Date(dto.date_of_birth),
           password_hash: await hashPassword(dto.password),
+          // Cria a conta (saldo 0) junto, no mesmo INSERT atômico
+          accounts: { create: {} },
         },
         select: userSelect,
       });
@@ -130,6 +132,12 @@ function handlePrismaError(error: unknown): unknown {
     }
     if (error.code === 'P2025') {
       return new NotFoundException('Usuário não encontrado');
+    }
+    // Chave estrangeira: a conta tem movimentações (ON DELETE RESTRICT)
+    if (error.code === 'P2003') {
+      return new ConflictException(
+        'Usuário possui movimentações financeiras e não pode ser removido',
+      );
     }
   }
   return error;

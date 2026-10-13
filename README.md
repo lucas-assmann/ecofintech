@@ -77,6 +77,34 @@ UPDATE users SET role = 'admin' WHERE email = 'fulano@email.com';
 
 Hoje só `GET /users` (listar todos) é exclusiva de admin.
 
+## Saldo e movimentações
+
+```
+users 1───1 accounts (balance) 1───N transactions
+```
+
+- **Conta:** criada automaticamente no cadastro, com saldo 0. `GET /accounts/me` devolve o saldo.
+- **Movimentações** (`transactions`): cada linha é um lançamento em uma conta, com `type` (`entrada` | `saida`), `category` (`deposito` | `transferencia`), `amount` e `balance_after` (saldo logo após o lançamento).
+  - `POST /transactions/deposit` (**somente admin**): dinheiro entrando de fora. Gera uma `entrada`.
+  - `POST /transactions/transfer`: do usuário logado para outro, pelo e-mail (`to_email`). Gera uma `saida` na origem e uma `entrada` no destino.
+  - `GET /transactions` (extrato, com `limit`/`offset`) e `GET /transactions/:id`.
+- **Valores:** `NUMERIC(15,2)` no banco; na API, entram como número (máx. 2 casas, de 0,01 a 1.000.000 por operação) e saem como texto (`"200.00"`).
+
+Garantias:
+
+- Saldo e lançamentos são gravados na mesma transação do banco: ou tudo é aplicado, ou nada.
+- O débito só acontece se houver saldo (`422 Saldo insuficiente`), e o banco tem `CHECK (balance >= 0)` como segunda barreira. Transferências simultâneas nunca deixam o saldo negativo.
+- As duas contas de uma transferência são travadas sempre na mesma ordem (por id), evitando deadlock.
+- Lançamentos são imutáveis (sem rotas de edição ou exclusão). Um usuário com movimentações não pode ser removido (`409`).
+- O saldo deve sempre bater com o extrato. Para conferir no banco:
+
+```sql
+SELECT a.id, a.balance,
+       COALESCE(SUM(CASE t.type WHEN 'entrada' THEN t.amount ELSE -t.amount END), 0) AS soma_extrato
+FROM accounts a LEFT JOIN transactions t ON t.account_id = a.id
+GROUP BY a.id, a.balance;
+```
+
 ## Documentação da API
 
 Com a API rodando:

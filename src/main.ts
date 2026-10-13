@@ -6,10 +6,14 @@ import { AppModule } from './app.module.js';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Valida os DTOs de entrada e descarta campos que não estão neles;
-  // campos desconhecidos geram erro 400
+  // Valida os DTOs de entrada; campos desconhecidos geram erro 400.
+  // transform: converte query params (texto) para os tipos do DTO (ex.: limit → number)
   app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
   );
 
   const swaggerConfig = new DocumentBuilder()

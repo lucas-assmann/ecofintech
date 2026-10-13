@@ -1,45 +1,27 @@
+import { Controller, Get } from '@nestjs/common';
 import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+import type { JwtPayload } from '../../common/guards/auth.guard.js';
 import { AccountsService } from './accounts.service.js';
-import { CreateAccountDto } from './dto/create-account.dto.js';
-import { UpdateAccountDto } from './dto/update-account.dto.js';
+import { Account } from './entities/account.entity.js';
 
+// A conta é criada automaticamente no cadastro e o saldo só muda por
+// movimentações, então não há rotas para criar, editar ou apagar contas.
 @ApiTags('Accounts')
 @ApiBearerAuth()
 @Controller('accounts')
 export class AccountsController {
   constructor(private readonly accountsService: AccountsService) {}
 
-  @Post()
-  create(@Body() createAccountDto: CreateAccountDto) {
-    return this.accountsService.create(createAccountDto);
-  }
-
-  @Get()
-  findAll() {
-    return this.accountsService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.accountsService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateAccountDto: UpdateAccountDto) {
-    return this.accountsService.update(+id, updateAccountDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.accountsService.remove(+id);
+  @Get('me')
+  @ApiOperation({ summary: 'Conta e saldo do usuário logado' })
+  @ApiOkResponse({ type: Account })
+  findMine(@CurrentUser() user: JwtPayload) {
+    return this.accountsService.findByUser(user.sub);
   }
 }

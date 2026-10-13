@@ -1,26 +1,17 @@
-import { Injectable } from '@nestjs/common';
-import { CreateAccountDto } from './dto/create-account.dto.js';
-import { UpdateAccountDto } from './dto/update-account.dto.js';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../database/prisma.service.js';
+import { Account } from './entities/account.entity.js';
 
 @Injectable()
 export class AccountsService {
-  create(createAccountDto: CreateAccountDto) {
-    return 'This action adds a new account';
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
-  findAll() {
-    return `This action returns all accounts`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} account`;
-  }
-
-  update(id: number, updateAccountDto: UpdateAccountDto) {
-    return `This action updates a #${id} account`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} account`;
+  async findByUser(user_id: string): Promise<Account> {
+    const account = await this.prisma.accounts.findUnique({
+      where: { user_id },
+      select: { id: true, balance: true, created_at: true, updated_at: true },
+    });
+    if (!account) throw new NotFoundException('Conta não encontrada');
+    return { ...account, balance: account.balance.toFixed(2) };
   }
 }

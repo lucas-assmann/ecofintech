@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Ecofintech API",
-    "description": "Requests da API da Ecofintech.\n\n**Fluxo:** Auth → Cadastrar → Login (salva o token) → demais requests. Rodando a collection inteira (*Run collection*), tudo acontece nessa ordem e o usuário de teste é removido no fim.\n\nA autenticação (Bearer `{{token}}`) é configurada na collection e herdada por todas as requests; as públicas usam *No Auth*.\n\nVariáveis:\n- `base_url`: endereço da API\n- `user_email` / `user_password`: credenciais do usuário cadastrado\n- `user_new_password`: usada em Alterar senha (as duas trocam de lugar após a troca)\n- `user_id`, `token`: preenchidas automaticamente",
+    "description": "Requests da API da Ecofintech.\n\n**Fluxo (Run collection):** Health → Auth (cadastra e loga um usuário de teste) → Accounts → Transactions → Users.\n\n**Depósito exige admin.** Para testar depósito e transferência, preencha `admin_email` e `admin_password` com um usuário admin (promova com `UPDATE users SET role = 'admin' WHERE email = '...';`). Sem isso, as requests que dependem de admin são puladas.\n\nA autenticação (Bearer `{{token}}`) é configurada na collection e herdada por todas as requests; as públicas usam *No Auth*.\n\nVariáveis:\n- `base_url`: endereço da API\n- `user_email` / `user_password`: usuário de teste (preenchidos no Cadastrar)\n- `user_new_password`: usada em Alterar senha (as duas trocam de lugar após a troca)\n- `admin_email` / `admin_password`: credenciais de um admin (você preenche)\n- `user_id`, `token`, `admin_token`, `transaction_id`: preenchidas automaticamente",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -13,10 +13,12 @@
     { "key": "user_email", "value": "", "type": "string" },
     { "key": "user_password", "value": "senhaForte123", "type": "string" },
     { "key": "user_new_password", "value": "novaSenha456", "type": "string" },
+    { "key": "admin_email", "value": "", "type": "string" },
+    { "key": "admin_password", "value": "", "type": "string" },
     { "key": "user_id", "value": "", "type": "string" },
     { "key": "token", "value": "", "type": "string" },
-    { "key": "account_id", "value": "1", "type": "string" },
-    { "key": "transaction_id", "value": "1", "type": "string" }
+    { "key": "admin_token", "value": "", "type": "string" },
+    { "key": "transaction_id", "value": "", "type": "string" }
   ],
   "item": [
     {
@@ -59,7 +61,7 @@
               "raw": "{\n  \"name\": \"Maria Silva\",\n  \"email\": \"maria.{{$timestamp}}@email.com\",\n  \"date_of_birth\": \"1995-08-20\",\n  \"password\": \"{{user_password}}\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "description": "Cadastra um usuário (POST /users). Pública.\n\nSalva `user_id` e `user_email` para o Login. O e-mail usa `{{$timestamp}}` para ser único a cada execução.\n\nErros: 400 (dados inválidos), 409 (e-mail já cadastrado)."
+            "description": "Cadastra um usuário (POST /users) e cria a conta dele com saldo 0. Pública.\n\nSalva `user_id` e `user_email` para o Login. O e-mail usa `{{$timestamp}}` para ser único a cada execução.\n\nErros: 400 (dados inválidos), 409 (e-mail já cadastrado)."
           },
           "event": [
             {
@@ -116,11 +118,49 @@
           ]
         },
         {
+          "name": "Login admin",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Login com as credenciais de admin (`admin_email` / `admin_password`). Salva o token em `admin_token`, usado no Depositar.\n\nPulada se `admin_email` estiver vazio."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_email')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "if (body.access_token) pm.collectionVariables.set('admin_token', body.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Usuário logado (me)",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/auth/me",
-            "description": "Devolve os dados do usuário dono do token.\n\nErros: 401 (token ausente, inválido ou expirado)."
+            "description": "Devolve os dados do usuário dono do token (inclui o `role`).\n\nErros: 401 (token ausente, inválido ou expirado)."
           },
           "event": [
             {
@@ -138,6 +178,181 @@
       ]
     },
     {
+      "name": "Accounts",
+      "item": [
+        {
+          "name": "Meu saldo",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/accounts/me",
+            "description": "Conta e saldo do usuário logado. O saldo vem como texto com 2 casas (ex.: \"200.00\")."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Saldo com 2 casas', () => pm.expect(pm.response.json().balance).to.match(/^\\d+\\.\\d{2}$/));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "description": "Movimentações são imutáveis: não há rotas para editar nem apagar.",
+      "item": [
+        {
+          "name": "Depositar (admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{admin_token}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/transactions/deposit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to_email\": \"{{user_email}}\",\n  \"amount\": 200,\n  \"description\": \"Depósito inicial\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Deposita na conta de um usuário. **Somente admin** (usa `admin_token`). Gera um lançamento de entrada.\n\nPulada se `admin_token` estiver vazio.\n\nErros: 400, 401, 403 (não é admin), 404 (destinatário não encontrado)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const tx = pm.response.json();",
+                  "pm.test('Lançamento de entrada', () => pm.expect(tx.type).to.eql('entrada'));",
+                  "if (tx.id) pm.collectionVariables.set('transaction_id', tx.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transferir",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/transactions/transfer",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to_email\": \"{{admin_email}}\",\n  \"amount\": 50,\n  \"description\": \"Pagamento\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Transfere do usuário logado para outro usuário, identificado pelo e-mail. Gera saída na origem e entrada no destino; a resposta é o lançamento de saída.\n\nNo fluxo da collection, envia 50 para o admin. Pulada se `admin_email` estiver vazio.\n\nErros: 400 (dados inválidos ou para a própria conta), 401, 404 (destinatário não encontrado), 422 (saldo insuficiente)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_email')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const tx = pm.response.json();",
+                  "pm.test('Lançamento de saída', () => pm.expect(tx.type).to.eql('saida'));",
+                  "if (tx.id) pm.collectionVariables.set('transaction_id', tx.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extrato",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/transactions?limit=50&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["transactions"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Itens por página (1 a 100)"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Quantos itens pular"
+                }
+              ]
+            },
+            "description": "Extrato do usuário logado, do mais recente para o mais antigo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Retorna uma lista', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar lançamento",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/transactions/{{transaction_id}}",
+            "description": "Detalhe de um lançamento do usuário logado (usa o `transaction_id` salvo pelo Transferir).\n\nErros: 400 (id não é UUID), 401, 404 (não existe ou é de outra conta)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('transaction_id')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Users",
       "description": "Exigem token. Nas rotas com `:id`, o id precisa ser o do usuário logado (senão 403).",
       "item": [
@@ -146,7 +361,7 @@
           "request": {
             "method": "GET",
             "url": "{{base_url}}/users",
-            "description": "Lista todos os usuários, do mais recente para o mais antigo. **Somente admin.**\n\nO usuário criado em Cadastrar é comum, então aqui recebe 403. Com o token de um admin, retorna 200.\n\nPara promover alguém (no pgAdmin): `UPDATE users SET role = 'admin' WHERE email = '...';`"
+            "description": "Lista todos os usuários, do mais recente para o mais antigo. **Somente admin.**\n\nO usuário criado em Cadastrar é comum, então aqui recebe 403. Com o token de um admin, retorna 200."
           },
           "event": [
             {
@@ -243,7 +458,7 @@
           "request": {
             "method": "DELETE",
             "url": "{{base_url}}/users/{{user_id}}",
-            "description": "Remove o próprio usuário.\n\nErros: 400, 401, 403, 404."
+            "description": "Remove o próprio usuário (e a conta).\n\nSe a conta tiver movimentações, retorna 409: o histórico financeiro não pode ser apagado.\n\nErros: 400, 401, 403, 404, 409."
           },
           "event": [
             {
@@ -251,111 +466,11 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                  "pm.test('204 sem movimentações, 409 com movimentações', () => pm.expect(pm.response.code).to.be.oneOf([204, 409]));"
                 ]
               }
             }
           ]
-        }
-      ]
-    },
-    {
-      "name": "Accounts",
-      "description": "Exigem token. Rotas ainda são o esqueleto gerado pela CLI (sem banco).",
-      "item": [
-        {
-          "name": "Criar conta",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{base_url}}/accounts",
-            "body": {
-              "mode": "raw",
-              "raw": "{}",
-              "options": { "raw": { "language": "json" } }
-            }
-          }
-        },
-        {
-          "name": "Listar contas",
-          "request": { "method": "GET", "url": "{{base_url}}/accounts" }
-        },
-        {
-          "name": "Buscar conta",
-          "request": {
-            "method": "GET",
-            "url": "{{base_url}}/accounts/{{account_id}}"
-          }
-        },
-        {
-          "name": "Atualizar conta",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{base_url}}/accounts/{{account_id}}",
-            "body": {
-              "mode": "raw",
-              "raw": "{}",
-              "options": { "raw": { "language": "json" } }
-            }
-          }
-        },
-        {
-          "name": "Remover conta",
-          "request": {
-            "method": "DELETE",
-            "url": "{{base_url}}/accounts/{{account_id}}"
-          }
-        }
-      ]
-    },
-    {
-      "name": "Transactions",
-      "description": "Exigem token. Rotas ainda são o esqueleto gerado pela CLI (sem banco).",
-      "item": [
-        {
-          "name": "Criar transação",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{base_url}}/transactions",
-            "body": {
-              "mode": "raw",
-              "raw": "{}",
-              "options": { "raw": { "language": "json" } }
-            }
-          }
-        },
-        {
-          "name": "Listar transações",
-          "request": { "method": "GET", "url": "{{base_url}}/transactions" }
-        },
-        {
-          "name": "Buscar transação",
-          "request": {
-            "method": "GET",
-            "url": "{{base_url}}/transactions/{{transaction_id}}"
-          }
-        },
-        {
-          "name": "Atualizar transação",
-          "request": {
-            "method": "PATCH",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": "{{base_url}}/transactions/{{transaction_id}}",
-            "body": {
-              "mode": "raw",
-              "raw": "{}",
-              "options": { "raw": { "language": "json" } }
-            }
-          }
-        },
-        {
-          "name": "Remover transação",
-          "request": {
-            "method": "DELETE",
-            "url": "{{base_url}}/transactions/{{transaction_id}}"
-          }
         }
       ]
     }
