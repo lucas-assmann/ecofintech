@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
 } from '@nestjs/common';
 import {
+  ApiBadRequestResponse,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiNoContentResponse,
@@ -22,6 +23,7 @@ import {
 import { UsersService } from './users.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
+import { UpdatePasswordDto } from './dto/update-password.dto.js';
 import { User } from './entities/user.entity.js';
 
 @ApiTags('Users')
@@ -64,6 +66,21 @@ export class UsersController {
     @Body() updateUserDto: UpdateUserDto,
   ) {
     return this.usersService.update(id, updateUserDto);
+  }
+
+  @Patch(':id/password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Altera a senha (exige a senha atual)' })
+  @ApiNoContentResponse({ description: 'Senha alterada' })
+  @ApiBadRequestResponse({
+    description: 'Senha atual incorreta ou nova senha inválida',
+  })
+  @ApiNotFoundResponse({ description: 'Usuário não encontrado' })
+  updatePassword(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updatePasswordDto: UpdatePasswordDto,
+  ) {
+    return this.usersService.updatePassword(id, updatePasswordDto);
   }
 
   @Delete(':id')

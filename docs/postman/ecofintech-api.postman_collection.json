@@ -46,10 +46,10 @@
             "url": "{{base_url}}/users",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Maria Silva\",\n  \"email\": \"maria@email.com\",\n  \"date_of_birth\": \"1995-08-20\",\n  \"password\": \"senhaForte123\"\n}",
+              "raw": "{\n  \"name\": \"Maria Silva\",\n  \"email\": \"maria.{{$timestamp}}@email.com\",\n  \"date_of_birth\": \"1995-08-20\",\n  \"password\": \"senhaForte123\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "description": "Cadastra um usuário. Salva o `id` retornado na variável `user_id`.\n\nErros: 400 (dados inválidos), 409 (e-mail já cadastrado)."
+            "description": "Cadastra um usuário. Salva o `id` retornado na variável `user_id`. O e-mail usa `{{$timestamp}}` para ser único a cada execução.\n\nErros: 400 (dados inválidos), 409 (e-mail já cadastrado)."
           },
           "event": [
             {
@@ -121,7 +121,7 @@
               "raw": "{\n  \"name\": \"Maria S. Souza\"\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "description": "Atualiza só os campos enviados (`name`, `email`, `date_of_birth`, `password`).\n\nErros: 400, 404, 409."
+            "description": "Atualiza só os campos enviados (`name`, `email`, `date_of_birth`). A senha não é aceita aqui: use **Alterar senha**.\n\nErros: 400, 404, 409."
           },
           "event": [
             {
@@ -130,6 +130,31 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alterar senha",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/users/{{user_id}}/password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"senhaForte123\",\n  \"new_password\": \"novaSenha456\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Altera a senha do usuário. Exige a senha atual.\n\nErros: 400 (senha atual incorreta ou nova senha inválida), 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
                 ]
               }
             }

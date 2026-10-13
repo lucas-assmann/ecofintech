@@ -1,8 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import { Prisma } from '../../database/generated/prisma/client.js';
-import { verifyPassword } from '../../common/utils/password.js';
+import { hashPassword, verifyPassword } from '../../common/utils/password.js';
 import { UsersService } from './users.service.js';
 
 const prismaError = (code: string) =>
@@ -93,5 +97,46 @@ describe('UsersService', () => {
     prisma.users.delete.mockRejectedValue(prismaError('P2025'));
 
     await expect(service.remove('1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  describe('updatePassword', () => {
+    const dto = {
+      current_password: 'senhaForte123',
+      new_password: 'novaSenha456',
+    };
+
+    it('troca a senha quando a atual está correta', async () => {
+      prisma.users.findUnique.mockResolvedValue({
+        password_hash: await hashPassword('senhaForte123'),
+      });
+
+      await service.updatePassword('1', dto);
+
+      const { data } = prisma.users.update.mock.calls[0][0] as {
+        data: { password_hash: string };
+      };
+      expect(await verifyPassword('novaSenha456', data.password_hash)).toBe(
+        true,
+      );
+    });
+
+    it('lança BadRequest e não altera quando a senha atual está errada', async () => {
+      prisma.users.findUnique.mockResolvedValue({
+        password_hash: await hashPassword('outraSenha'),
+      });
+
+      await expect(service.updatePassword('1', dto)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(prisma.users.update).not.toHaveBeenCalled();
+    });
+
+    it('lança NotFound quando o usuário não existe', async () => {
+      prisma.users.findUnique.mockResolvedValue(null);
+
+      await expect(service.updatePassword('1', dto)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
   });
 });

@@ -1,13 +1,15 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import { Prisma } from '../../database/generated/prisma/client.js';
-import { hashPassword } from '../../common/utils/password.js';
+import { hashPassword, verifyPassword } from '../../common/utils/password.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
+import { UpdatePasswordDto } from './dto/update-password.dto.js';
 import { User } from './entities/user.entity.js';
 
 // Campos devolvidos pela API. password_hash nunca entra aqui.
@@ -71,9 +73,6 @@ export class UsersService {
           date_of_birth: dto.date_of_birth
             ? new Date(dto.date_of_birth)
             : undefined,
-          password_hash: dto.password
-            ? await hashPassword(dto.password)
-            : undefined,
           updated_at: new Date(),
         },
         select: userSelect,
@@ -82,6 +81,28 @@ export class UsersService {
     } catch (error) {
       throw handlePrismaError(error);
     }
+  }
+
+  async updatePassword(id: string, dto: UpdatePasswordDto): Promise<void> {
+    const user = await this.prisma.users.findUnique({
+      where: { id },
+      select: { password_hash: true },
+    });
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+
+    const valid = await verifyPassword(
+      dto.current_password,
+      user.password_hash,
+    );
+    if (!valid) throw new BadRequestException('Senha atual incorreta');
+
+    await this.prisma.users.update({
+      where: { id },
+      data: {
+        password_hash: await hashPassword(dto.new_password),
+        updated_at: new Date(),
+      },
+    });
   }
 
   async remove(id: string): Promise<void> {
