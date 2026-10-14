@@ -3,11 +3,16 @@ import { useAuth } from '../auth/context'
 import { firstName } from '../lib/format'
 import { Logo } from './Logo'
 import { ThemeToggle } from './ThemeToggle'
+import { AccountSwitcher } from './AccountSwitcher'
+import { InvitesBell } from './InvitesBell'
+import { Alert } from './ui/Alert'
+import { useActiveAccount } from '../auth/account-context'
 import {
   HomeIcon,
   ListIcon,
   LogoutIcon,
   SendIcon,
+  BuildingIcon,
   ShieldIcon,
   UserIcon,
 } from './icons'
@@ -36,13 +41,14 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 
 export function AppLayout() {
   const { user, isAdmin, logout } = useAuth()
+  const { active, revokedNotice } = useActiveAccount()
 
   return (
     <div className="min-h-dvh pb-20 md:pb-0">
       <header className="sticky top-0 z-20 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[1680px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-16 max-w-[1680px] items-center justify-between gap-2 px-4 sm:gap-4 sm:px-6 lg:px-8">
           <NavLink to="/" aria-label="Ecofintech, início">
-            <Logo />
+            <Logo compact />
           </NavLink>
 
           <nav aria-label="Principal" className="hidden items-center gap-1 md:flex">
@@ -54,18 +60,21 @@ export function AppLayout() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-2">
-            <span className="hidden text-sm text-slate-600 dark:text-slate-400 sm:inline">
+          <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+            <span className="hidden text-sm text-slate-600 dark:text-slate-400 xl:inline">
               Olá, <strong className="text-slate-900 dark:text-slate-100">{firstName(user?.name ?? '')}</strong>
             </span>
+            <AccountSwitcher />
+            <InvitesBell />
             <ThemeToggle />
             <button
               type="button"
               onClick={() => logout()}
+              aria-label="Sair"
               className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
             >
               <LogoutIcon />
-              <span className="hidden sm:inline">Sair</span>
+              <span className="hidden lg:inline">Sair</span>
             </button>
           </div>
         </div>
@@ -98,9 +107,25 @@ export function AppLayout() {
             </nav>
           </div>
         )}
+        {/* Com dinheiro não pode haver dúvida de qual conta está em uso */}
+        {active?.kind === 'company' && (
+          <div className="border-t border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/60">
+            <p className="mx-auto flex max-w-[1680px] items-center gap-2 px-4 py-2 text-sm text-sky-900 sm:px-6 lg:px-8 dark:text-sky-100">
+              <BuildingIcon className="size-4 shrink-0" />
+              <span className="truncate">
+                Você está operando como <strong>{active.name}</strong>
+              </span>
+            </p>
+          </div>
+        )}
       </header>
 
       <main className="mx-auto max-w-[1680px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        {revokedNotice && (
+          <div className="mb-6">
+            <Alert tone="warning">{revokedNotice}</Alert>
+          </div>
+        )}
         <Outlet />
       </main>
 

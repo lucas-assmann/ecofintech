@@ -14,6 +14,7 @@ import {
   SESSION_EXPIRED_EVENT,
   setToken,
 } from './session'
+import { setActiveAccountId } from './account'
 import {
   AuthContext,
   SESSION_EXPIRED_MESSAGE,
@@ -39,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (message?: string) => {
       setNotice(message ?? null)
       clearToken()
+      setActiveAccountId(null)
       setTokenState(null)
       queryClient.clear()
       navigate('/login', { replace: true })
@@ -54,10 +56,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [endSession])
 
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (
+      email: string,
+      password: string,
+      beforeEnter?: () => Promise<void>,
+    ) => {
       const { access_token } = await requests.login({ email, password })
       setToken(access_token)
+      // Cada login começa na conta pessoal
+      setActiveAccountId(null)
       queryClient.clear()
+      await beforeEnter?.()
       setNotice(null)
       setTokenState(access_token)
     },

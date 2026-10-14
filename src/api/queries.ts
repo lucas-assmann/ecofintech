@@ -4,6 +4,10 @@ import * as requests from './requests'
 // Chaves de cache: invalidar uma delas faz a tela buscar de novo
 export const queryKeys = {
   account: ['account'] as const,
+  // Não dependem da conta ativa: sobrevivem à troca de conta
+  accounts: ['accounts'] as const,
+  invites: ['invites'] as const,
+  members: (companyId: string) => ['members', companyId] as const,
   transactions: ['transactions'] as const,
   transactionsPage: (limit: number, offset: number) =>
     ['transactions', limit, offset] as const,
@@ -39,6 +43,24 @@ export const useSummary = (days: requests.SummaryDays) =>
     queryFn: () => requests.getSummary(days),
     // Ao trocar o período, o gráfico anterior fica na tela até o novo chegar
     placeholderData: keepPreviousData,
+  })
+
+/** Contas com saldo atualizado: recarrega ao abrir a tela que usa */
+export const useAccounts = () =>
+  useQuery({ queryKey: queryKeys.accounts, queryFn: requests.listAccounts })
+
+export const useInvites = (enabled = true) =>
+  useQuery({
+    queryKey: queryKeys.invites,
+    queryFn: requests.listInvites,
+    enabled,
+  })
+
+export const useMembers = (companyId: string | null) =>
+  useQuery({
+    queryKey: queryKeys.members(companyId ?? ''),
+    queryFn: () => requests.listMembers(companyId!),
+    enabled: Boolean(companyId),
   })
 
 export const useAdminTransactions = (

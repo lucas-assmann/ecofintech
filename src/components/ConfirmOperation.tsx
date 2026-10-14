@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Transaction } from '../api/client'
 import { errorMessage, isNetworkError } from '../api/client'
-import { formatCpf, formatDateTime, formatMoney } from '../lib/format'
+import { formatCnpj, formatCpf, formatDateTime, formatMoney } from '../lib/format'
 import {
   newIdempotencyKey,
   type MoneyOperationValues,
@@ -10,15 +10,23 @@ import { Alert } from './ui/Alert'
 import { Button } from './ui/Button'
 import { CheckIcon } from './icons'
 
-function Summary({ values }: { values: MoneyOperationValues }) {
+function Summary({ values, from }: { values: MoneyOperationValues; from?: string }) {
   return (
     <dl className="space-y-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 p-4 text-sm">
+      {from && (
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-500 dark:text-slate-400">De</dt>
+          <dd className="text-right font-semibold text-slate-900 dark:text-slate-100">{from}</dd>
+        </div>
+      )}
       <div className="flex justify-between gap-4">
         <dt className="text-slate-500 dark:text-slate-400">Para</dt>
         <dd className="text-right font-medium break-all">
           {values.mode === 'cpf'
             ? `CPF ${formatCpf(values.recipient)}`
-            : values.recipient}
+            : values.mode === 'cnpj'
+              ? `CNPJ ${formatCnpj(values.recipient)}`
+              : values.recipient}
         </dd>
       </div>
       {values.description && (
@@ -44,12 +52,15 @@ function Summary({ values }: { values: MoneyOperationValues }) {
  */
 export function ConfirmOperation({
   values,
+  from,
   confirmLabel,
   execute,
   onBack,
   onDone,
 }: {
   values: MoneyOperationValues
+  /** Nome da conta de onde o dinheiro sai (transferência; o depósito vem de fora) */
+  from?: string
   confirmLabel: string
   execute: (idempotencyKey: string) => Promise<Transaction>
   onBack: () => void
@@ -76,7 +87,7 @@ export function ConfirmOperation({
 
   return (
     <div className="space-y-5">
-      <Summary values={values} />
+      <Summary values={values} from={from} />
 
       {error && (
         <Alert tone="error" title={error.retry ? 'Não foi possível confirmar' : undefined}>

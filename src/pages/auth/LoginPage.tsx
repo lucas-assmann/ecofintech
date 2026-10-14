@@ -3,6 +3,9 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Link, useLocation, useNavigate } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '../../api/queries'
+import { listAccounts, listInvites } from '../../api/requests'
 import { useAuth } from '../../auth/context'
 import { errorMessage } from '../../api/client'
 import { Alert } from '../../components/ui/Alert'
@@ -19,6 +22,7 @@ type FormValues = z.infer<typeof schema>
 export function LoginPage() {
   const { login, notice } = useAuth()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const location = useLocation()
   const state = location.state as { from?: string } | null
   const [error, setError] = useState<string | null>(null)
@@ -32,8 +36,18 @@ export function LoginPage() {
   const onSubmit = handleSubmit(async ({ email, password }) => {
     setError(null)
     try {
-      await login(email, password)
-      navigate(state?.from ?? '/', { replace: true })
+      let destination = state?.from ?? '/'
+      await login(email, password, async () => {
+        // Quem tem empresa (ou convite) escolhe com qual conta vai operar.
+        // Decide aqui, antes de "entrar": senão a tela de login redireciona
+        // para o início e as duas navegações disputam quem chega por último.
+        const [accounts, invites] = await Promise.all([
+          queryClient.fetchQuery({ queryKey: queryKeys.accounts, queryFn: listAccounts }),
+          queryClient.fetchQuery({ queryKey: queryKeys.invites, queryFn: listInvites }),
+        ]).catch(() => [[], []])
+        if (accounts.length > 1 || invites.length > 0) destination = '/contas'
+      })
+      navigate(destination, { replace: true })
     } catch (err) {
       setError(errorMessage(err))
     }

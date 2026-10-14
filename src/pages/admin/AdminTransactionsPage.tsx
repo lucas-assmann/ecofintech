@@ -81,7 +81,7 @@ export function AdminTransactionsPage() {
         <Card className="lg:sticky lg:top-6">
           <form onSubmit={apply} noValidate className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
             <div className="sm:col-span-2 lg:col-span-1">
-              <Field label="Cliente" hint="Parte do nome, do e-mail ou do CPF do dono da conta.">
+              <Field label="Cliente" hint="Parte do nome, e-mail ou CPF da pessoa, ou do nome fantasia ou CNPJ da empresa.">
                 {(a11y) => (
                   <Input
                     {...a11y}

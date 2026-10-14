@@ -1,6 +1,11 @@
 import createClient, { type Middleware } from 'openapi-fetch'
 import type { components, paths } from './schema'
 import { expireSession, getToken } from '../auth/session'
+import {
+  getActiveAccountId,
+  NO_ACCESS_MESSAGE,
+  revokeActiveAccount,
+} from '../auth/account'
 
 export type Schemas = components['schemas']
 export type User = Schemas['User']
@@ -8,6 +13,9 @@ export type Account = Schemas['Account']
 export type Transaction = Schemas['Transaction']
 export type AdminTransaction = Schemas['AdminTransaction']
 export type TransactionSummary = Schemas['TransactionSummary']
+export type OperableAccount = Schemas['OperableAccount']
+export type CompanyMembers = Schemas['CompanyMembers']
+export type PendingInvite = Schemas['PendingInvite']
 export type DeactivationRequest = Schemas['DeactivationRequest']
 
 export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
@@ -37,6 +45,27 @@ const auth: Middleware = {
   },
 }
 api.use(auth)
+
+// Conta ativa: a API usa a conta pessoal quando o cabeçalho não vem
+const account: Middleware = {
+  onRequest({ request }) {
+    const id = getActiveAccountId()
+    if (id) request.headers.set('X-Account-Id', id)
+    return request
+  },
+  async onResponse({ request, response }) {
+    // Só o 403 de "sem acesso a esta conta" (ex.: removido da empresa);
+    // outros 403, como rota de admin, não mexem na conta escolhida
+    if (response.status === 403 && request.headers.has('X-Account-Id')) {
+      const body = (await response.clone().json().catch(() => null)) as {
+        message?: unknown
+      } | null
+      if (body?.message === NO_ACCESS_MESSAGE) revokeActiveAccount()
+    }
+    return response
+  },
+}
+api.use(account)
 
 /** Erro devolvido pela API, com o status HTTP e a mensagem já em texto. */
 export class ApiError extends Error {

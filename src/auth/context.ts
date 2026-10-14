@@ -6,7 +6,16 @@ export interface AuthContextValue {
   /** true enquanto ainda verifica se o token salvo é válido */
   loading: boolean
   isAdmin: boolean
-  login: (email: string, password: string) => Promise<void>
+  /**
+   * Faz login. beforeEnter roda com o token já salvo (as requisições já
+   * funcionam), mas antes de o app considerar a pessoa logada: é o momento de
+   * decidir para onde ir, sem as telas de visitante redirecionarem antes.
+   */
+  login: (
+    email: string,
+    password: string,
+    beforeEnter?: () => Promise<void>,
+  ) => Promise<void>
   /**
    * Encerra a sessão e volta para o login, opcionalmente com uma mensagem.
    * skipApi: quando o token já não vale (ex.: logo após trocar a senha).

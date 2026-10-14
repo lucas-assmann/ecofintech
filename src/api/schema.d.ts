@@ -75,6 +75,23 @@ export interface paths {
         patch: operations["UsersController_updatePassword"];
         trace?: never;
     };
+    "/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Contas que o usuário pode usar (pessoal e empresas), para escolher com qual operar */
+        get: operations["AccountsController_listOperable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/accounts/me": {
         parameters: {
             query?: never;
@@ -82,7 +99,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Conta e saldo do usuário logado */
+        /** Conta ativa e o seu saldo */
         get: operations["AccountsController_findMine"];
         put?: never;
         post?: never;
@@ -150,7 +167,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Extrato do usuário logado (mais recentes primeiro) */
+        /** Extrato da conta ativa (mais recentes primeiro) */
         get: operations["TransactionsController_findAll"];
         put?: never;
         post?: never;
@@ -167,7 +184,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Resumo de entradas e saídas do usuário logado no período (dashboard) */
+        /** Resumo de entradas e saídas da conta ativa no período (dashboard) */
         get: operations["TransactionsController_summary"];
         put?: never;
         post?: never;
@@ -201,7 +218,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Detalhe de um lançamento (usuário: só da própria conta; admin: qualquer um) */
+        /** Detalhe de um lançamento (usuário: só da conta ativa; admin: qualquer um) */
         get: operations["TransactionsController_findOne"];
         put?: never;
         post?: never;
@@ -365,6 +382,159 @@ export interface paths {
         patch: operations["DeactivationRequestsController_reject"];
         trace?: never;
     };
+    "/companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Abre uma empresa: o usuário vira o dono e a conta da empresa é criada na hora */
+        post: operations["CompaniesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Membros da empresa (qualquer membro); convites pendentes só para o dono */
+        get: operations["CompaniesController_listMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{id}/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Convida alguém já cadastrado, por e-mail ou CPF (somente o dono) */
+        post: operations["CompaniesController_invite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{id}/invites/{inviteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Cancela um convite pendente (somente o dono) */
+        delete: operations["CompaniesController_cancelInvite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove um membro (somente o dono). O acesso dele cai na próxima requisição */
+        delete: operations["CompaniesController_removeMember"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/companies/{id}/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sai da empresa (o dono não pode sair) */
+        post: operations["CompaniesController_leave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Convites pendentes do usuário logado */
+        get: operations["InvitesController_listPending"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Aceita o convite e entra na empresa como membro */
+        post: operations["InvitesController_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/{id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recusa o convite */
+        post: operations["InvitesController_decline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -475,6 +645,33 @@ export interface components {
              */
             new_password: string;
         };
+        /**
+         * @description Papel na empresa (null na conta pessoal)
+         * @enum {string}
+         */
+        company_role: "owner" | "member";
+        OperableAccount: {
+            /** @enum {string} */
+            kind: "personal" | "company";
+            /** @description Papel na empresa (null na conta pessoal) */
+            role: components["schemas"]["company_role"] | null;
+            /** @description Id da conta (é o valor do cabeçalho X-Account-Id) */
+            id: string;
+            /**
+             * @description Nome da pessoa ou nome fantasia da empresa
+             * @example Padaria Pão Bom
+             */
+            name: string;
+            /**
+             * @description CPF (11 dígitos) ou CNPJ (14 dígitos), só números
+             * @example 11222333000181
+             */
+            document: string;
+            /** @example 1200.00 */
+            balance: string;
+            /** @description Id da empresa (null na conta pessoal) */
+            company_id: string | null;
+        };
         Account: {
             /** @example 8d2f6c1a-4b3e-4f5a-9c7d-1e2f3a4b5c6d */
             id: string;
@@ -491,15 +688,20 @@ export interface components {
         DepositDto: {
             /**
              * Format: email
-             * @description E-mail de quem vai receber. Informe este ou `to_cpf`.
+             * @description E-mail de quem vai receber. Informe só um entre `to_email`, `to_cpf` e `to_cnpj`.
              * @example fulano@email.com
              */
             to_email?: string;
             /**
-             * @description CPF de quem vai receber, com ou sem pontuação. Informe este ou `to_email`.
+             * @description CPF de quem vai receber, com ou sem pontuação.
              * @example 529.982.247-25
              */
             to_cpf?: string;
+            /**
+             * @description CNPJ da empresa que vai receber, com ou sem pontuação.
+             * @example 11.222.333/0001-81
+             */
+            to_cnpj?: string;
             /**
              * @description Valor em reais, com no máximo 2 casas decimais
              * @example 200
@@ -518,16 +720,33 @@ export interface components {
         transaction_type: "entrada" | "saida";
         /** @enum {string} */
         transaction_category: "deposito" | "transferencia" | "estorno";
-        Counterparty: {
-            /** @example Fulano de Tal */
+        Operator: {
+            /** @example Maria Silva */
             name: string;
-            /** @example fulano@email.com */
-            email: string;
+        };
+        Counterparty: {
+            /**
+             * @description E-mail da pessoa (null quando é uma empresa)
+             * @example fulano@email.com
+             */
+            email: string | null;
+            /** @enum {string} */
+            kind: "person" | "company";
+            /**
+             * @description Nome da pessoa ou nome fantasia da empresa
+             * @example Fulano de Tal
+             */
+            name: string;
         };
         Transaction: {
             /** @description entrada (dinheiro chegou) ou saida (dinheiro saiu) */
             type: components["schemas"]["transaction_type"];
             category: components["schemas"]["transaction_category"];
+            /**
+             * @description Quem fez a operação. Só em transferências enviadas pela conta de uma
+             *     empresa (para saber qual membro pagou); null nos demais.
+             */
+            operator: components["schemas"]["Operator"] | null;
             /** @example 5b1e7c2d-3a4f-4e6b-8c9d-0a1b2c3d4e5f */
             id: string;
             /**
@@ -552,15 +771,20 @@ export interface components {
         TransferDto: {
             /**
              * Format: email
-             * @description E-mail de quem vai receber. Informe este ou `to_cpf`.
+             * @description E-mail de quem vai receber. Informe só um entre `to_email`, `to_cpf` e `to_cnpj`.
              * @example fulano@email.com
              */
             to_email?: string;
             /**
-             * @description CPF de quem vai receber, com ou sem pontuação. Informe este ou `to_email`.
+             * @description CPF de quem vai receber, com ou sem pontuação.
              * @example 529.982.247-25
              */
             to_cpf?: string;
+            /**
+             * @description CNPJ da empresa que vai receber, com ou sem pontuação.
+             * @example 11.222.333/0001-81
+             */
+            to_cnpj?: string;
             /**
              * @description Valor em reais, com no máximo 2 casas decimais
              * @example 200
@@ -632,6 +856,11 @@ export interface components {
             /** @description entrada (dinheiro chegou) ou saida (dinheiro saiu) */
             type: components["schemas"]["transaction_type"];
             category: components["schemas"]["transaction_category"];
+            /**
+             * @description Quem fez a operação. Só em transferências enviadas pela conta de uma
+             *     empresa (para saber qual membro pagou); null nos demais.
+             */
+            operator: components["schemas"]["Operator"] | null;
             /** @example 5b1e7c2d-3a4f-4e6b-8c9d-0a1b2c3d4e5f */
             id: string;
             /**
@@ -652,7 +881,7 @@ export interface components {
             reversal_of: string | null;
             /** Format: date-time */
             created_at: string;
-            /** @description Dono da conta em que o lançamento foi feito */
+            /** @description Dono da conta em que o lançamento foi feito (pessoa ou empresa) */
             owner: components["schemas"]["Counterparty"];
         };
         LoginDto: {
@@ -748,6 +977,86 @@ export interface components {
              * @example Conta encerrada a pedido do cliente
              */
             note?: string;
+        };
+        CreateCompanyDto: {
+            /**
+             * @description CNPJ, com ou sem pontuação
+             * @example 11.222.333/0001-81
+             */
+            cnpj: string;
+            /**
+             * @description Razão social (nome oficial)
+             * @example Pão Bom Comércio de Alimentos LTDA
+             */
+            legal_name: string;
+            /**
+             * @description Nome fantasia (aparece para quem recebe transferências)
+             * @example Padaria Pão Bom
+             */
+            trade_name: string;
+        };
+        CompanyMember: {
+            role: components["schemas"]["company_role"];
+            user_id: string;
+            /** @example Maria Silva */
+            name: string;
+            /** @example maria@email.com */
+            email: string;
+            /**
+             * Format: date-time
+             * @description Quando entrou na empresa
+             */
+            created_at: string;
+        };
+        InvitedUser: {
+            /** @example João Souza */
+            name: string;
+            /** @example joao@email.com */
+            email: string;
+        };
+        CompanyInvite: {
+            id: string;
+            invited_user: components["schemas"]["InvitedUser"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        CompanyMembers: {
+            /** @description Dono primeiro, depois por ordem de entrada */
+            members: components["schemas"]["CompanyMember"][];
+            /** @description Convites pendentes (vazio para quem não é dono) */
+            invites: components["schemas"]["CompanyInvite"][];
+        };
+        CreateInviteDto: {
+            /**
+             * Format: email
+             * @description E-mail de quem já tem conta no Ecofintech. Informe este ou `cpf`.
+             * @example joao@email.com
+             */
+            email?: string;
+            /**
+             * @description CPF de quem já tem conta, com ou sem pontuação. Informe este ou `email`.
+             * @example 529.982.247-25
+             */
+            cpf?: string;
+        };
+        InviteCompany: {
+            id: string;
+            /** @example Padaria Pão Bom */
+            trade_name: string;
+            /** @example 11222333000181 */
+            cnpj: string;
+        };
+        InviteSender: {
+            /** @example Maria Silva */
+            name: string;
+        };
+        PendingInvite: {
+            id: string;
+            company: components["schemas"]["InviteCompany"];
+            /** @description Quem convidou (o dono da empresa) */
+            invited_by: components["schemas"]["InviteSender"];
+            /** Format: date-time */
+            created_at: string;
         };
     };
     responses: never;
@@ -1001,10 +1310,32 @@ export interface operations {
             };
         };
     };
-    AccountsController_findMine: {
+    AccountsController_listOperable: {
         parameters: {
             query?: never;
             header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperableAccount"][];
+                };
+            };
+        };
+    };
+    AccountsController_findMine: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Conta ativa (sem ele: conta pessoal) */
+                "X-Account-Id"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1078,6 +1409,8 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
+                /** @description Conta ativa (sem ele: conta pessoal) */
+                "X-Account-Id"?: string;
                 /** @description UUID único por operação. Reenviar a mesma chave devolve o resultado original sem repetir a operação. */
                 "Idempotency-Key": string;
             };
@@ -1184,7 +1517,10 @@ export interface operations {
                 /** @description Quantos lançamentos pular (para paginar) */
                 offset: number;
             };
-            header?: never;
+            header?: {
+                /** @description Conta ativa (sem ele: conta pessoal) */
+                "X-Account-Id"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1206,7 +1542,10 @@ export interface operations {
                 /** @description Período em dias, contando hoje (7, 30 ou 90) */
                 days: 7 | 30 | 90;
             };
-            header?: never;
+            header?: {
+                /** @description Conta ativa (sem ele: conta pessoal) */
+                "X-Account-Id"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1278,7 +1617,10 @@ export interface operations {
     TransactionsController_findOne: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Conta ativa (sem ele: conta pessoal) */
+                "X-Account-Id"?: string;
+            };
             path: {
                 id: string;
             };
@@ -1606,6 +1948,314 @@ export interface operations {
             };
             /** @description Solicitação já avaliada */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CompaniesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCompanyDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperableAccount"];
+                };
+            };
+            /** @description CNPJ ou nomes inválidos */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description CNPJ já cadastrado */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CompaniesController_listMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyMembers"];
+                };
+            };
+            /** @description Não faz parte da empresa */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CompaniesController_invite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInviteDto"];
+            };
+        };
+        responses: {
+            /** @description Convite criado */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Informe email ou cpf (só um) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Não é o dono da empresa */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Usuário não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Já faz parte da empresa ou já tem convite pendente */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Convidar a si mesmo ou usuário desativado */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CompaniesController_cancelInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                inviteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Convite cancelado */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Não é o dono da empresa */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Convite não encontrado ou já respondido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CompaniesController_removeMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Membro removido */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Não é o dono da empresa */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Membro não encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description O dono não pode se remover */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CompaniesController_leave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Saiu da empresa */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Não faz parte da empresa */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description O dono não pode sair */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvitesController_listPending: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingInvite"][];
+                };
+            };
+        };
+    };
+    InvitesController_accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Agora faz parte da empresa */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Convite não encontrado, de outra pessoa ou já respondido */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    InvitesController_decline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Convite recusado */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Convite não encontrado, de outra pessoa ou já respondido */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

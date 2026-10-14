@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addDays,
+  formatCnpj,
   formatCpf,
   formatDayMonth,
   formatMoney,
@@ -65,5 +66,14 @@ describe('datas do gráfico', () => {
 
   it('soma dias atravessando o mês', () => {
     expect(addDays('2026-09-28', 6)).toBe('2026-10-04')
+  })
+})
+
+describe('formatCnpj', () => {
+  it('formata só dígitos e enquanto digita', () => {
+    expect(formatCnpj('11222333000181')).toBe('11.222.333/0001-81')
+    expect(formatCnpj('11.222.333/0001-81')).toBe('11.222.333/0001-81')
+    expect(formatCnpj('112223')).toBe('11.222.3')
+    expect(formatCnpj('11222333000181999')).toBe('11.222.333/0001-81')
   })
 })

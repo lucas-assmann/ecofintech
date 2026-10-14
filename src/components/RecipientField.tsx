@@ -1,9 +1,15 @@
-import { formatCpf } from '../lib/format'
+import { formatCnpj, formatCpf } from '../lib/format'
 import { Input } from './ui/Field'
 
-export type RecipientMode = 'email' | 'cpf'
+export type RecipientMode = 'email' | 'cpf' | 'cnpj'
 
-/** Escolha entre e-mail e CPF + o campo correspondente. */
+const options = {
+  email: { label: 'E-mail', placeholder: 'fulano@email.com', format: (v: string) => v },
+  cpf: { label: 'CPF', placeholder: '000.000.000-00', format: formatCpf },
+  cnpj: { label: 'CNPJ', placeholder: '00.000.000/0000-00', format: formatCnpj },
+} as const
+
+/** Escolha entre e-mail, CPF e CNPJ (empresa) + o campo correspondente. */
 export function RecipientField({
   id,
   mode,
@@ -12,6 +18,7 @@ export function RecipientField({
   onChange,
   invalid,
   describedBy,
+  modes = ['email', 'cpf', 'cnpj'],
 }: {
   id: string
   mode: RecipientMode
@@ -20,6 +27,8 @@ export function RecipientField({
   onChange: (value: string) => void
   invalid: boolean
   describedBy?: string
+  /** Quais formas aparecem (ex.: convite só aceita pessoas: e-mail e CPF) */
+  modes?: RecipientMode[]
 }) {
   return (
     <div className="space-y-2">
@@ -28,7 +37,7 @@ export function RecipientField({
         aria-label="Identificar destinatário por"
         className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1"
       >
-        {(['email', 'cpf'] as const).map((option) => (
+        {modes.map((option) => (
           <button
             key={option}
             type="button"
@@ -44,7 +53,7 @@ export function RecipientField({
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            {option === 'email' ? 'E-mail' : 'CPF'}
+            {options[option].label}
           </button>
         ))}
       </div>
@@ -55,11 +64,9 @@ export function RecipientField({
         type={mode === 'email' ? 'email' : 'text'}
         inputMode={mode === 'email' ? 'email' : 'numeric'}
         autoComplete="off"
-        placeholder={mode === 'email' ? 'fulano@email.com' : '000.000.000-00'}
+        placeholder={options[mode].placeholder}
         value={value}
-        onChange={(e) =>
-          onChange(mode === 'cpf' ? formatCpf(e.target.value) : e.target.value)
-        }
+        onChange={(e) => onChange(options[mode].format(e.target.value))}
       />
     </div>
   )

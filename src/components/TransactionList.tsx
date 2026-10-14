@@ -67,6 +67,7 @@ export function TransactionList({ items, action }: TransactionListProps) {
                   )}
                   {formatDateTime(t.created_at)}
                   {t.description ? ` · ${t.description}` : ''}
+                  {t.operator ? ` · feita por ${t.operator.name}` : ''}
                 </span>
               </span>
               <Amount t={t} className="shrink-0" />
@@ -91,10 +92,14 @@ export function TransactionList({ items, action }: TransactionListProps) {
   )
 }
 
+/** "Fulano (fulano@email.com)" para pessoas; "Padaria (empresa)" para empresas */
+const partyLabel = (party: Transaction['counterparty'] & object) =>
+  party.kind === 'company' ? `${party.name} (empresa)` : `${party.name} (${party.email})`
+
 function TransactionDetails({ t }: { t: Item }) {
   const owner = ownerOf(t)
   const rows: [string, ReactNode][] = [
-    ...(owner ? [['Conta de', `${owner.name} (${owner.email})`] as [string, ReactNode]] : []),
+    ...(owner ? [['Conta de', partyLabel(owner)] as [string, ReactNode]] : []),
     ['Tipo', describeTransaction(t)],
     ['Data', formatDateTime(t.created_at)],
     ['Saldo após', <span key="saldo" className="tabular">{formatMoney(t.balance_after)}</span>],
@@ -102,9 +107,10 @@ function TransactionDetails({ t }: { t: Item }) {
   if (t.counterparty) {
     rows.push([
       isIncoming(t) ? 'De' : 'Para',
-      `${t.counterparty.name} (${t.counterparty.email})`,
+      partyLabel(t.counterparty),
     ])
   }
+  if (t.operator) rows.push(['Feita por', t.operator.name])
   if (t.description) rows.push(['Descrição', t.description])
   if (t.reversal_of) rows.push(['Estorno do lançamento', <code key="estorno" className="text-xs break-all">{t.reversal_of}</code>])
 

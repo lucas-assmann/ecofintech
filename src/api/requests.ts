@@ -41,7 +41,65 @@ export const deleteUser = async (id: string) =>
 
 // ---------- Conta ----------
 
+/** Conta ativa (a do cabeçalho X-Account-Id; sem ele, a pessoal). */
 export const getMyAccount = async () => unwrap(await api.GET('/accounts/me'))
+
+/** Contas que a pessoa pode usar: a pessoal e as das empresas. */
+export const listAccounts = async () => unwrap(await api.GET('/accounts'))
+
+// ---------- Empresas ----------
+
+export const createCompany = async (body: Schemas['CreateCompanyDto']) =>
+  unwrap(await api.POST('/companies', { body }))
+
+export const listMembers = async (companyId: string) =>
+  unwrap(
+    await api.GET('/companies/{id}/members', {
+      params: { path: { id: companyId } },
+    }),
+  )
+
+export const inviteToCompany = async (
+  companyId: string,
+  body: Schemas['CreateInviteDto'],
+) =>
+  unwrap(
+    await api.POST('/companies/{id}/invites', {
+      params: { path: { id: companyId } },
+      body,
+    }),
+  )
+
+export const cancelInvite = async (companyId: string, inviteId: string) =>
+  unwrap(
+    await api.DELETE('/companies/{id}/invites/{inviteId}', {
+      params: { path: { id: companyId, inviteId } },
+    }),
+  )
+
+export const removeMember = async (companyId: string, userId: string) =>
+  unwrap(
+    await api.DELETE('/companies/{id}/members/{userId}', {
+      params: { path: { id: companyId, userId } },
+    }),
+  )
+
+export const leaveCompany = async (companyId: string) =>
+  unwrap(
+    await api.POST('/companies/{id}/leave', {
+      params: { path: { id: companyId } },
+    }),
+  )
+
+// ---------- Convites (de quem foi convidado) ----------
+
+export const listInvites = async () => unwrap(await api.GET('/invites'))
+
+export const acceptInvite = async (id: string) =>
+  unwrap(await api.POST('/invites/{id}/accept', { params: { path: { id } } }))
+
+export const declineInvite = async (id: string) =>
+  unwrap(await api.POST('/invites/{id}/decline', { params: { path: { id } } }))
 
 // ---------- Movimentações ----------
 

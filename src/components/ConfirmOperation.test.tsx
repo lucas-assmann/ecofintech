@@ -84,4 +84,20 @@ describe('ConfirmOperation', () => {
 
     expect(execute.mock.calls[0][0]).not.toBe(execute.mock.calls[1][0])
   })
+
+  it('mostra de qual conta o dinheiro sai, quando informado', () => {
+    render(
+      <ConfirmOperation
+        values={values}
+        from="Padaria Pão Bom"
+        confirmLabel="Confirmar"
+        execute={vi.fn()}
+        onBack={vi.fn()}
+        onDone={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('De')).toBeInTheDocument()
+    expect(screen.getByText('Padaria Pão Bom')).toBeInTheDocument()
+  })
 })
