@@ -29,7 +29,16 @@ const entry = (overrides: object = {}) => ({
   created_at: new Date(),
   accounts_transactions_counterparty_account_idToaccounts: {
     users: { name: 'Fulano', email: 'fulano@email.com' },
+    companies: null,
   },
+  // Conta do próprio lançamento (pessoal, a menos que o teste diga outra coisa)
+  accounts_transactions_account_idToaccounts: {
+    company_id: null,
+    users: { name: 'Dono', email: 'dono@email.com' },
+    companies: null,
+  },
+  // Quem fez a operação (created_by)
+  users: { name: 'Autor' },
   ...overrides,
 });
 
@@ -62,7 +71,17 @@ describe('TransactionsService', () => {
   const sender = (id: string) =>
     tx.accounts.findUnique.mockResolvedValue({ id });
   const recipient = (id: string, status = 'active') =>
-    tx.accounts.findFirst.mockResolvedValue({ id, users: { status } });
+    tx.accounts.findFirst.mockResolvedValue({
+      id,
+      users: { status },
+      companies: null,
+    });
+  const companyRecipient = (id: string, status = 'active') =>
+    tx.accounts.findFirst.mockResolvedValue({
+      id,
+      users: null,
+      companies: { status },
+    });
 
   beforeEach(async () => {
     vi.resetAllMocks();
@@ -146,28 +165,45 @@ describe('TransactionsService', () => {
     it('mesma chave e mesmos dados: devolve o original sem mover dinheiro', async () => {
       prisma.idempotency_keys.findUnique.mockResolvedValue({
         endpoint: 'transfer',
-        request_hash: await hashOf(dto),
+        request_hash: await hashOf({ ...dto, from_account_id: 'acc-a' }),
         transaction_id: 'tx-1',
       });
       prisma.transactions.findUniqueOrThrow.mockResolvedValue(entry());
 
-      const result = await service.transfer('user-a', KEY, dto);
+      const result = await service.transfer('user-a', 'acc-a', KEY, dto);
 
       expect(result.replayed).toBe(true);
       expect(result.transaction.id).toBe('tx-1');
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
-    it('mesma chave com dados diferentes: 422', async () => {
+    it('mesma chave e mesmos dados, mas de outra conta: 422 (nunca devolve a operação da outra conta)', async () => {
       prisma.idempotency_keys.findUnique.mockResolvedValue({
         endpoint: 'transfer',
-        request_hash: await hashOf({ ...dto, amount: 999 }),
+        request_hash: await hashOf({ ...dto, from_account_id: 'acc-a' }),
         transaction_id: 'tx-1',
       });
 
-      await expect(service.transfer('user-a', KEY, dto)).rejects.toBeInstanceOf(
-        UnprocessableEntityException,
-      );
+      await expect(
+        service.transfer('user-a', 'acc-empresa', KEY, dto),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
+      expect(prisma.transactions.findUniqueOrThrow).not.toHaveBeenCalled();
+    });
+
+    it('mesma chave com dados diferentes: 422', async () => {
+      prisma.idempotency_keys.findUnique.mockResolvedValue({
+        endpoint: 'transfer',
+        request_hash: await hashOf({
+          ...dto,
+          amount: 999,
+          from_account_id: 'acc-a',
+        }),
+        transaction_id: 'tx-1',
+      });
+
+      await expect(
+        service.transfer('user-a', 'acc-a', KEY, dto),
+      ).rejects.toBeInstanceOf(UnprocessableEntityException);
     });
 
     it('requisição repetida em paralelo: a segunda devolve o resultado da primeira', async () => {
@@ -176,13 +212,13 @@ describe('TransactionsService', () => {
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({
           endpoint: 'transfer',
-          request_hash: await hashOf(dto),
+          request_hash: await hashOf({ ...dto, from_account_id: 'acc-a' }),
           transaction_id: 'tx-1',
         });
       prisma.$transaction.mockRejectedValue(prismaError('P2002'));
       prisma.transactions.findUniqueOrThrow.mockResolvedValue(entry());
 
-      const result = await service.transfer('user-a', KEY, dto);
+      const result = await service.transfer('user-a', 'acc-a', KEY, dto);
 
       expect(result.replayed).toBe(true);
     });
@@ -195,10 +231,34 @@ describe('TransactionsService', () => {
       sender('acc-a');
       recipient('acc-a');
 
-      await expect(service.transfer('user-a', KEY, dto)).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.transfer('user-a', 'acc-a', KEY, dto),
+      ).rejects.toBeInstanceOf(BadRequestException);
       expect(tx.accounts.update).not.toHaveBeenCalled();
+    });
+
+    it('debita a conta ativa recebida (não procura a conta pessoal do usuário)', async () => {
+      recipient('acc-b');
+      tx.accounts.update.mockResolvedValue({ balance: D('0') });
+      tx.transactions.create.mockResolvedValue(entry());
+
+      await service.transfer('user-a', 'acc-empresa', KEY, {
+        to_email: 'fulano@email.com',
+        amount: 50,
+      });
+
+      expect(tx.accounts.findUnique).not.toHaveBeenCalled();
+      expect(tx.accounts.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'acc-empresa', balance: { gte: D('50') } },
+        }),
+      );
+      const [outgoing] = createdData(tx.transactions.create);
+      expect(outgoing).toMatchObject({
+        account_id: 'acc-empresa',
+        type: 'saida',
+        created_by: 'user-a',
+      });
     });
 
     it('cria saída e entrada com o mesmo operation_id e o remetente como autor', async () => {
@@ -209,7 +269,7 @@ describe('TransactionsService', () => {
         .mockResolvedValueOnce({ balance: D('50') }); // crédito em acc-b
       tx.transactions.create.mockResolvedValueOnce(entry());
 
-      const result = await service.transfer('user-a', KEY, dto);
+      const result = await service.transfer('user-a', 'acc-a', KEY, dto);
 
       const [outgoing, incoming] = createdData(tx.transactions.create);
       expect(outgoing).toMatchObject({
@@ -240,12 +300,60 @@ describe('TransactionsService', () => {
       tx.accounts.update.mockResolvedValue({ balance: D('0') });
       tx.transactions.create.mockResolvedValue(entry());
 
-      await service.transfer('user-z', KEY, dto);
+      await service.transfer('user-z', 'acc-z', KEY, dto);
 
       const updatedIds = tx.accounts.update.mock.calls.map(
         ([arg]) => (arg as { where: { id: string } }).where.id,
       );
       expect(updatedIds).toEqual(['acc-a', 'acc-z']);
+    });
+
+    it('encontra a empresa de destino pelo CNPJ', async () => {
+      companyRecipient('acc-empresa');
+      tx.accounts.update.mockResolvedValue({ balance: D('0') });
+      tx.transactions.create.mockResolvedValue(entry());
+
+      await service.transfer('user-a', 'acc-a', KEY, {
+        to_cnpj: '11222333000181',
+        amount: 50,
+      });
+
+      expect(tx.accounts.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { companies: { cnpj: '11222333000181' } },
+        }),
+      );
+      const [, incoming] = createdData(tx.transactions.create);
+      expect(incoming).toMatchObject({
+        account_id: 'acc-empresa',
+        type: 'entrada',
+      });
+    });
+
+    it('não transfere para empresa desativada', async () => {
+      companyRecipient('acc-empresa', 'deactivated');
+
+      await expect(
+        service.transfer('user-a', 'acc-a', KEY, {
+          to_cnpj: '11222333000181',
+          amount: 50,
+        }),
+      ).rejects.toThrow(
+        new UnprocessableEntityException('Conta de destino desativada'),
+      );
+    });
+
+    it('permite transferir da empresa para a conta pessoal do próprio dono', async () => {
+      recipient('acc-pessoal-do-dono');
+      tx.accounts.update.mockResolvedValue({ balance: D('0') });
+      tx.transactions.create.mockResolvedValue(entry());
+
+      await expect(
+        service.transfer('user-a', 'acc-empresa', KEY, {
+          to_cpf: '52998224725',
+          amount: 50,
+        }),
+      ).resolves.toBeDefined();
     });
 
     it('encontra o destinatário pelo CPF', async () => {
@@ -254,7 +362,7 @@ describe('TransactionsService', () => {
       tx.accounts.update.mockResolvedValue({ balance: D('0') });
       tx.transactions.create.mockResolvedValue(entry());
 
-      await service.transfer('user-a', KEY, {
+      await service.transfer('user-a', 'acc-a', KEY, {
         to_cpf: '52998224725',
         amount: 50,
       });
@@ -270,11 +378,15 @@ describe('TransactionsService', () => {
         'os dois',
         { to_email: 'fulano@email.com', to_cpf: '52998224725', amount: 50 },
       ],
-    ])('exige to_email ou to_cpf (recusa %s)', async (_caso, body) => {
+      [
+        'e-mail e CNPJ',
+        { to_email: 'fulano@email.com', to_cnpj: '11222333000181', amount: 50 },
+      ],
+    ])('exige exatamente um destinatário (recusa %s)', async (_caso, body) => {
       sender('acc-a');
 
       await expect(
-        service.transfer('user-a', KEY, body),
+        service.transfer('user-a', 'acc-a', KEY, body),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -282,9 +394,9 @@ describe('TransactionsService', () => {
       sender('acc-a');
       recipient('acc-b', 'deactivated');
 
-      await expect(service.transfer('user-a', KEY, dto)).rejects.toThrow(
-        'Conta de destino desativada',
-      );
+      await expect(
+        service.transfer('user-a', 'acc-a', KEY, dto),
+      ).rejects.toThrow('Conta de destino desativada');
       expect(tx.accounts.update).not.toHaveBeenCalled();
     });
 
@@ -293,9 +405,9 @@ describe('TransactionsService', () => {
       recipient('acc-b');
       tx.accounts.update.mockRejectedValueOnce(prismaError('P2025'));
 
-      await expect(service.transfer('user-a', KEY, dto)).rejects.toThrow(
-        'Saldo insuficiente',
-      );
+      await expect(
+        service.transfer('user-a', 'acc-a', KEY, dto),
+      ).rejects.toThrow('Saldo insuficiente');
       expect(tx.transactions.create).not.toHaveBeenCalled();
     });
   });
@@ -424,12 +536,11 @@ describe('TransactionsService', () => {
   describe('findOne', () => {
     it('usuário comum só vê lançamentos da própria conta', async () => {
       prisma.users.findUnique.mockResolvedValue({ role: 'user' });
-      prisma.accounts.findUnique.mockResolvedValue({ id: 'acc-a' });
       prisma.transactions.findFirst.mockResolvedValue(null);
 
-      await expect(service.findOne('user-a', 'tx-x')).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.findOne('user-a', 'acc-a', 'tx-x'),
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.transactions.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'tx-x', account_id: 'acc-a' } }),
       );
@@ -439,7 +550,7 @@ describe('TransactionsService', () => {
       prisma.users.findUnique.mockResolvedValue({ role: 'admin' });
       prisma.transactions.findFirst.mockResolvedValue(entry());
 
-      await service.findOne('admin-1', 'tx-1');
+      await service.findOne('admin-1', 'acc-admin', 'tx-1');
 
       expect(prisma.transactions.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'tx-1' } }),
@@ -460,7 +571,9 @@ describe('TransactionsService', () => {
       prisma.transactions.findMany.mockResolvedValue([
         entry({
           accounts_transactions_account_idToaccounts: {
+            company_id: null,
             users: { name: 'Beltrano', email: 'beltrano@email.com' },
+            companies: null,
           },
         }),
       ]);
@@ -470,8 +583,16 @@ describe('TransactionsService', () => {
       expect(result).toMatchObject({
         id: 'tx-1',
         amount: '50.00',
-        owner: { name: 'Beltrano', email: 'beltrano@email.com' },
-        counterparty: { name: 'Fulano', email: 'fulano@email.com' },
+        owner: {
+          name: 'Beltrano',
+          email: 'beltrano@email.com',
+          kind: 'person',
+        },
+        counterparty: {
+          name: 'Fulano',
+          email: 'fulano@email.com',
+          kind: 'person',
+        },
       });
       expect(result).not.toHaveProperty(
         'accounts_transactions_account_idToaccounts',
@@ -493,20 +614,53 @@ describe('TransactionsService', () => {
       });
     });
 
-    it('busca por nome, e-mail ou CPF (ignorando pontuação do CPF)', async () => {
+    it('busca pessoa (nome, e-mail, CPF) ou empresa (nome fantasia, CNPJ), ignorando pontuação', async () => {
       prisma.transactions.findMany.mockResolvedValue([]);
 
       await service.findAllAdmin({ ...page, search: ' 123.456 ' });
 
       expect(whereArg().accounts_transactions_account_idToaccounts).toEqual({
-        users: {
-          OR: [
-            { name: { contains: '123.456', mode: 'insensitive' } },
-            { email: { contains: '123.456', mode: 'insensitive' } },
-            { cpf: { contains: '123456' } },
-          ],
-        },
+        OR: [
+          {
+            users: {
+              OR: [
+                { name: { contains: '123.456', mode: 'insensitive' } },
+                { email: { contains: '123.456', mode: 'insensitive' } },
+                { cpf: { contains: '123456' } },
+              ],
+            },
+          },
+          {
+            companies: {
+              OR: [
+                { trade_name: { contains: '123.456', mode: 'insensitive' } },
+                { cnpj: { contains: '123456' } },
+              ],
+            },
+          },
+        ],
       });
+    });
+
+    it('dono da conta pode ser uma empresa', async () => {
+      prisma.transactions.findMany.mockResolvedValue([
+        entry({
+          accounts_transactions_account_idToaccounts: {
+            company_id: 'company-1',
+            users: null,
+            companies: { trade_name: 'Padaria Pão Bom' },
+          },
+        }),
+      ]);
+
+      const [result] = await service.findAllAdmin(page);
+
+      expect(result.owner).toEqual({
+        name: 'Padaria Pão Bom',
+        email: null,
+        kind: 'company',
+      });
+      expect(result.operator).toEqual({ name: 'Autor' });
     });
 
     it('sem dígitos na busca, não filtra por CPF', async () => {
@@ -515,9 +669,78 @@ describe('TransactionsService', () => {
       await service.findAllAdmin({ ...page, search: 'fulano' });
 
       const filter = whereArg().accounts_transactions_account_idToaccounts as {
-        users: { OR: unknown[] };
+        OR: [{ users: { OR: unknown[] } }, { companies: { OR: unknown[] } }];
       };
-      expect(filter.users.OR).toHaveLength(2);
+      expect(filter.OR[0].users.OR).toHaveLength(2);
+      expect(filter.OR[1].companies.OR).toHaveLength(1);
+    });
+  });
+
+  describe('exibição no extrato', () => {
+    it('contraparte empresa: nome fantasia, sem e-mail', async () => {
+      prisma.transactions.findMany.mockResolvedValue([
+        entry({
+          accounts_transactions_counterparty_account_idToaccounts: {
+            users: null,
+            companies: { trade_name: 'Padaria Pão Bom' },
+          },
+        }),
+      ]);
+
+      const [result] = await service.findAll('acc-a', { limit: 10, offset: 0 });
+
+      expect(result.counterparty).toEqual({
+        name: 'Padaria Pão Bom',
+        email: null,
+        kind: 'company',
+      });
+    });
+
+    const companyAccount = {
+      company_id: 'company-1',
+      users: null,
+      companies: { trade_name: 'Padaria Pão Bom' },
+    };
+
+    it('"feita por" em transferência enviada da conta da empresa', async () => {
+      prisma.transactions.findMany.mockResolvedValue([
+        entry({ accounts_transactions_account_idToaccounts: companyAccount }),
+      ]);
+
+      const [result] = await service.findAll('acc-empresa', {
+        limit: 10,
+        offset: 0,
+      });
+
+      expect(result.operator).toEqual({ name: 'Autor' });
+      expect(result).not.toHaveProperty('users');
+      expect(result).not.toHaveProperty(
+        'accounts_transactions_account_idToaccounts',
+      );
+    });
+
+    it.each([
+      [
+        'entrada na conta da empresa (quem fez é de fora)',
+        {
+          type: 'entrada',
+          accounts_transactions_account_idToaccounts: companyAccount,
+        },
+      ],
+      ['saída da conta pessoal', { type: 'saida' }],
+      [
+        'estorno na conta da empresa (quem fez foi o admin)',
+        {
+          category: 'estorno',
+          accounts_transactions_account_idToaccounts: companyAccount,
+        },
+      ],
+    ])('sem "feita por": %s', async (_caso, overrides) => {
+      prisma.transactions.findMany.mockResolvedValue([entry(overrides)]);
+
+      const [result] = await service.findAll('acc-x', { limit: 10, offset: 0 });
+
+      expect(result.operator).toBeNull();
     });
   });
 
@@ -525,7 +748,6 @@ describe('TransactionsService', () => {
     const mockQueries = (
       series: { date: string; entradas: string; saidas: string }[],
     ) => {
-      prisma.accounts.findUnique.mockResolvedValue({ id: 'acc-a' });
       prisma.$queryRaw
         .mockResolvedValueOnce([{ from: '2026-10-07', to: '2026-10-13' }])
         .mockResolvedValueOnce(
@@ -546,7 +768,7 @@ describe('TransactionsService', () => {
         { date: '2026-10-08', entradas: '0', saidas: '150.5' },
       ]);
 
-      const result = await service.summary('user-a', { days: 7 });
+      const result = await service.summary('acc-a', { days: 7 });
 
       expect(result).toMatchObject({
         from: '2026-10-07',
@@ -568,7 +790,7 @@ describe('TransactionsService', () => {
     it('agrupa por semana no período de 90 dias', async () => {
       mockQueries([]);
 
-      const result = await service.summary('user-a', { days: 90 });
+      const result = await service.summary('acc-a', { days: 90 });
 
       expect(result.bucket).toBe('week');
       expect(result.resultado).toBe('0.00');

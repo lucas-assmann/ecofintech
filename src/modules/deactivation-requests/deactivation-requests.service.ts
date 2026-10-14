@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import { Prisma } from '../../database/generated/prisma/client.js';
@@ -42,6 +43,8 @@ export class DeactivationRequestsService {
     user_id: string,
     dto: CreateDeactivationRequestDto,
   ): Promise<DeactivationRequestCreatedResponse> {
+    await assertNotCompanyOwner(this.prisma, user_id);
+
     try {
       const request = await this.prisma.deactivation_requests.create({
         data: { user_id, reason: dto.reason },
@@ -98,6 +101,8 @@ export class DeactivationRequestsService {
   ): Promise<DeactivationRequest> {
     return this.prisma.$transaction(async (tx) => {
       const pending = await this.findPending(tx, id);
+      // De novo aqui: a pessoa pode ter aberto uma empresa depois do pedido
+      await assertNotCompanyOwner(tx, pending.user_id);
 
       const account = await tx.accounts.findUnique({
         where: { user_id: pending.user_id },
@@ -183,6 +188,25 @@ export class DeactivationRequestsService {
 function toRequest(request: SelectedRequest): DeactivationRequest {
   const { users_deactivation_requests_user_idTousers: user, ...rest } = request;
   return { ...rest, user };
+}
+
+/**
+ * Uma empresa precisa sempre de um dono: quem é dono de uma empresa ativa não
+ * pode ter a conta pessoal desativada (transferir a posse fica para depois).
+ */
+async function assertNotCompanyOwner(
+  client: Prisma.TransactionClient | PrismaService,
+  user_id: string,
+): Promise<void> {
+  const owned = await client.company_members.findFirst({
+    where: { user_id, role: 'owner', companies: { status: 'active' } },
+    select: { companies: { select: { trade_name: true } } },
+  });
+  if (owned) {
+    throw new UnprocessableEntityException(
+      `Você é dono da empresa ${owned.companies.trade_name}. Ela não pode ficar sem dono.`,
+    );
+  }
 }
 
 // Valor em reais no padrão brasileiro para mensagens (ex.: "R$ 1.234,56").

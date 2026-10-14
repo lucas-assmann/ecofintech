@@ -33,6 +33,10 @@ model users {
   token_version                                                  Int                     @default(0)
   accounts                                                       accounts?
   audit_logs                                                     audit_logs[]
+  companies                                                      companies[]
+  company_invites_company_invites_invited_byTousers              company_invites[]       @relation("company_invites_invited_byTousers")
+  company_invites_company_invites_invited_user_idTousers         company_invites[]       @relation("company_invites_invited_user_idTousers")
+  company_members                                                company_members[]
   deactivation_requests_deactivation_requests_reviewed_byTousers deactivation_requests[] @relation("deactivation_requests_reviewed_byTousers")
   deactivation_requests_deactivation_requests_user_idTousers     deactivation_requests?  @relation("deactivation_requests_user_idTousers")
   idempotency_keys                                               idempotency_keys[]
@@ -43,11 +47,13 @@ model users {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model accounts {
   id                                                          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id                                                     String         @unique @db.Uuid
+  user_id                                                     String?        @unique @db.Uuid
   balance                                                     Decimal        @default(0) @db.Decimal(15, 2)
   created_at                                                  DateTime       @default(now()) @db.Timestamptz(6)
   updated_at                                                  DateTime       @default(now()) @db.Timestamptz(6)
-  users                                                       users          @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  company_id                                                  String?        @unique @db.Uuid
+  companies                                                   companies?     @relation(fields: [company_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  users                                                       users?         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   transactions_transactions_account_idToaccounts              transactions[] @relation("transactions_account_idToaccounts")
   transactions_transactions_counterparty_account_idToaccounts transactions[] @relation("transactions_counterparty_account_idToaccounts")
 }
@@ -130,6 +136,50 @@ model password_reset_tokens {
   @@index([user_id, created_at(sort: Desc)])
 }
 
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model companies {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cnpj            String            @unique @db.Char(14)
+  legal_name      String
+  trade_name      String
+  status          company_status    @default(active)
+  created_by      String            @db.Uuid
+  created_at      DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime          @default(now()) @db.Timestamptz(6)
+  accounts        accounts?
+  users           users             @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  company_invites company_invites[]
+  company_members company_members[]
+}
+
+model company_invites {
+  id                                           String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_id                                   String                @db.Uuid
+  invited_user_id                              String                @db.Uuid
+  invited_by                                   String                @db.Uuid
+  status                                       company_invite_status @default(pending)
+  created_at                                   DateTime              @default(now()) @db.Timestamptz(6)
+  responded_at                                 DateTime?             @db.Timestamptz(6)
+  companies                                    companies             @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_company_invites_invited_byTousers      users                 @relation("company_invites_invited_byTousers", fields: [invited_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_company_invites_invited_user_idTousers users                 @relation("company_invites_invited_user_idTousers", fields: [invited_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([company_id, invited_user_id], map: "company_invites_one_pending", where: raw("(status = 'pending'::company_invite_status)"))
+}
+
+model company_members {
+  company_id String       @db.Uuid
+  user_id    String       @db.Uuid
+  role       company_role
+  created_at DateTime     @default(now()) @db.Timestamptz(6)
+  companies  companies    @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users        @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([company_id, user_id])
+  @@unique([company_id, role], map: "company_members_one_owner", where: raw("(role = 'owner'::company_role)"))
+  @@index([user_id])
+}
+
 enum user_role {
   user
   admin
@@ -153,6 +203,23 @@ enum deactivation_request_status {
 }
 
 enum user_status {
+  active
+  deactivated
+}
+
+enum company_invite_status {
+  pending
+  accepted
+  declined
+  canceled
+}
+
+enum company_role {
+  owner
+  member
+}
+
+enum company_status {
   active
   deactivated
 }

@@ -135,6 +135,22 @@ Rotas exclusivas de admin: `GET /users` (listar todos), `DELETE /users/:id` (rem
 
 Cada decisão registra quem avaliou (`reviewed_by`), quando e a observação.
 
+**Dono de empresa:** quem é dono de uma empresa ativa não pode pedir a desativação da conta pessoal (`422`), porque a empresa ficaria sem dono.
+
+## Contas de empresa
+
+O login é sempre da **pessoa**. Com ele, a pessoa opera a conta pessoal e as contas das empresas (CNPJ) das quais participa.
+
+- **Abrir:** `POST /companies` (`cnpj`, `legal_name` = razão social, `trade_name` = nome fantasia). Quem abre vira o **dono** e a conta da empresa é criada na hora. CNPJ validado e único (`409` se já cadastrado).
+- **Conta ativa:** o front envia o cabeçalho `X-Account-Id` com o id da conta escolhida. Sem ele, vale a conta pessoal. `GET /accounts/me`, `GET /transactions`, `GET /transactions/summary`, `GET /transactions/:id` e `POST /transactions/transfer` usam a conta ativa. O acesso é conferido **a cada requisição**: quem sai ou é removido de uma empresa perde o acesso na hora (`403` "Sem acesso a esta conta").
+- **Minhas contas:** `GET /accounts` lista a pessoal e as empresas (com o papel), para a tela de escolha de conta.
+- **Papéis:** `owner` (um por empresa) e `member`. Todo membro movimenta a conta; só o dono convida, cancela convites e remove membros.
+- **Convites (dono):** `POST /companies/:id/invites` (por `email` ou `cpf` de quem já tem conta), `DELETE /companies/:id/invites/:inviteId`, `DELETE /companies/:id/members/:userId`. `GET /companies/:id/members` mostra os membros (e, para o dono, os convites pendentes).
+- **Convites (convidado):** `GET /invites`, `POST /invites/:id/accept`, `POST /invites/:id/decline`. Membro sai com `POST /companies/:id/leave` (o dono não pode sair).
+- **Auditoria:** abrir empresa, convidar, cancelar, entrar, remover e sair ficam em `audit_logs` (`company.*`).
+
+Tabelas: `companies`, `company_members` (um único `owner` por empresa, garantido por índice), `company_invites` (um convite pendente por pessoa em cada empresa) e `accounts`, que pertence a uma pessoa (`user_id`) **ou** a uma empresa (`company_id`).
+
 ## Saldo e movimentações
 
 ```
@@ -144,7 +160,8 @@ users 1───1 accounts (balance) 1───N transactions
 - **Conta:** criada automaticamente no cadastro, com saldo 0. `GET /accounts/me` devolve o saldo.
 - **Movimentações** (`transactions`): cada linha é um lançamento em uma conta, com `type` (`entrada` | `saida`), `category` (`deposito` | `transferencia`), `amount` e `balance_after` (saldo logo após o lançamento).
   - `POST /transactions/deposit` (**somente admin**): dinheiro entrando de fora. Gera uma `entrada`.
-  - `POST /transactions/transfer`: do usuário logado para outro, identificado por `to_email` **ou** `to_cpf` (nunca os dois). Gera uma `saida` na origem e uma `entrada` no destino.
+  - `POST /transactions/transfer`: da conta ativa para outra conta, identificada por `to_email` ou `to_cpf` (pessoa) **ou** `to_cnpj` (empresa) — exatamente um. Gera uma `saida` na origem e uma `entrada` no destino. O depósito do admin aceita os mesmos campos.
+  - Cada lançamento traz `counterparty` (`{ name, email, kind }`: `kind` é `person` ou `company`; empresa aparece pelo nome fantasia e `email` nulo) e `operator`: o nome de quem fez a operação, preenchido só em transferências **enviadas pela conta de uma empresa** ("feita por Maria").
   - Depósito e transferência para conta desativada são recusados (`422`).
   - `POST /transactions/:id/reverse` (**somente admin**): estorno. Lança o movimento inverso com `category: "estorno"` e `reversal_of` apontando para o original. Estornar qualquer ponta de uma transferência desfaz as duas. Cada lançamento só pode ser estornado uma vez (`409`), estorno não se estorna (`422`) e é preciso saldo na conta que devolve (`422`).
   - `GET /transactions` (extrato, com `limit`/`offset`) e `GET /transactions/:id`.

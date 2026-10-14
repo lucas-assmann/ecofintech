@@ -29,6 +29,11 @@ import {
 } from '../../common/decorators/idempotency-key.decorator.js';
 import type { JwtPayload } from '../../common/guards/auth.guard.js';
 import {
+  ActiveAccount,
+  ApiActiveAccount,
+} from '../../common/decorators/active-account.decorator.js';
+import type { ActiveAccountContext } from '../accounts/account-access.service.js';
+import {
   OperationResult,
   TransactionsService,
 } from './transactions.service.js';
@@ -80,6 +85,7 @@ export class TransactionsController {
 
   @Post('transfer')
   @ApiIdempotencyKey()
+  @ApiActiveAccount()
   @ApiOperation({
     summary:
       'Transfere do usuário logado para outro usuário (por e-mail ou CPF)',
@@ -99,13 +105,19 @@ export class TransactionsController {
   })
   async transfer(
     @CurrentUser() user: JwtPayload,
+    @ActiveAccount() account: ActiveAccountContext,
     @IdempotencyKey() key: string,
     @Body() transferDto: TransferDto,
     @Res({ passthrough: true }) res: Response,
   ) {
     return withReplayHeader(
       res,
-      await this.transactionsService.transfer(user.sub, key, transferDto),
+      await this.transactionsService.transfer(
+        user.sub,
+        account.account_id,
+        key,
+        transferDto,
+      ),
     );
   }
 
@@ -135,30 +147,34 @@ export class TransactionsController {
   }
 
   @Get()
+  @ApiActiveAccount()
   @ApiOperation({
-    summary: 'Extrato do usuário logado (mais recentes primeiro)',
+    summary: 'Extrato da conta ativa (mais recentes primeiro)',
   })
   @ApiOkResponse({ type: [Transaction] })
   findAll(
-    @CurrentUser() user: JwtPayload,
+    @ActiveAccount() account: ActiveAccountContext,
     @Query() query: ListTransactionsQueryDto,
   ) {
-    return this.transactionsService.findAll(user.sub, query);
+    return this.transactionsService.findAll(account.account_id, query);
   }
 
   // As rotas fixas (summary, all) precisam vir antes de GET :id,
   // senão "summary" e "all" seriam lidos como um id
   @Get('summary')
+  @ApiActiveAccount()
   @ApiOperation({
     summary:
-      'Resumo de entradas e saídas do usuário logado no período (dashboard)',
+      'Resumo de entradas e saídas da conta ativa no período (dashboard)',
   })
   @ApiOkResponse({ type: TransactionSummary })
   @ApiBadRequestResponse({ description: 'Período inválido (use 7, 30 ou 90)' })
-  summary(@CurrentUser() user: JwtPayload, @Query() query: SummaryQueryDto) {
-    return this.transactionsService.summary(user.sub, query);
+  summary(
+    @ActiveAccount() account: ActiveAccountContext,
+    @Query() query: SummaryQueryDto,
+  ) {
+    return this.transactionsService.summary(account.account_id, query);
   }
-
 
   @Get('all')
   @Roles('admin')
@@ -174,17 +190,19 @@ export class TransactionsController {
   }
 
   @Get(':id')
+  @ApiActiveAccount()
   @ApiOperation({
     summary:
-      'Detalhe de um lançamento (usuário: só da própria conta; admin: qualquer um)',
+      'Detalhe de um lançamento (usuário: só da conta ativa; admin: qualquer um)',
   })
   @ApiOkResponse({ type: Transaction })
   @ApiNotFoundResponse({ description: 'Movimentação não encontrada' })
   findOne(
     @CurrentUser() user: JwtPayload,
+    @ActiveAccount() account: ActiveAccountContext,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.transactionsService.findOne(user.sub, id);
+    return this.transactionsService.findOne(user.sub, account.account_id, id);
   }
 }
 
