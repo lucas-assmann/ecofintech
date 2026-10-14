@@ -34,7 +34,7 @@ Variáveis do `.env` (a API valida todas ao iniciar e avisa o que estiver faltan
 | `SMTP_HOST` / `SMTP_PORT` | Servidor de e-mail (sem `SMTP_HOST`, o e-mail é só escrito no terminal da API) | `localhost` / `1025` |
 | `SMTP_USER` / `SMTP_PASS` | Login do servidor de e-mail, se ele exigir | |
 | `MAIL_FROM` | Remetente | `Ecofintech <nao-responda@ecofintech.local>` |
-| `TRUST_PROXY` | Quantos proxies ficam na frente da API, para o limite de requisições enxergar o IP real (opcional; `0` em dev) | `1` |
+| `TRUST_PROXY` | Quantos proxies ficam na frente da API, para o limite de requisições enxergar o IP real (opcional; `0` em dev, `3` no Render) | `3` |
 
 ### E-mails em desenvolvimento (Mailpit)
 
@@ -213,7 +213,7 @@ A documentação é gerada a partir do código: o plugin `@nestjs/swagger` (em `
 - **Build command:** `npm ci --include=dev && npm run build && npm run db:migrate`. O `--include=dev` é necessário porque, com `NODE_ENV=production`, o `npm ci` pula as devDependencies, e a CLI do Nest (`nest build`) está nelas.
 - **Start command:** `npm run start:prod`. **Health check:** `/`.
 - `DATABASE_URL` do Neon com `sslmode=verify-full`. As migrations rodam a cada deploy; as já aplicadas são puladas.
-- Variáveis de produção: as da tabela acima, com `NODE_ENV=production`, `TRUST_PROXY`, `CORS_ORIGINS`/`APP_URL` com o endereço do front, e `SMTP_*` do Resend (porta `2465`).
+- Variáveis de produção: as da tabela acima, com `NODE_ENV=production`, `TRUST_PROXY=3` (no Render a requisição passa por Cloudflare, balanceador e um proxy interno), `CORS_ORIGINS`/`APP_URL` com o endereço do front, e `SMTP_*` do Resend (porta `2465`).
 
 ## Testes e qualidade
 
