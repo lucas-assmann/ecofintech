@@ -36,14 +36,18 @@ export function LoginPage() {
   const onSubmit = handleSubmit(async ({ email, password }) => {
     setError(null)
     try {
-      await login(email, password)
-      // Quem tem empresa (ou convite) escolhe com qual conta vai operar
-      const [accounts, invites] = await Promise.all([
-        queryClient.fetchQuery({ queryKey: queryKeys.accounts, queryFn: listAccounts }),
-        queryClient.fetchQuery({ queryKey: queryKeys.invites, queryFn: listInvites }),
-      ]).catch(() => [[], []])
-      const choose = accounts.length > 1 || invites.length > 0
-      navigate(choose ? '/contas' : (state?.from ?? '/'), { replace: true })
+      let destination = state?.from ?? '/'
+      await login(email, password, async () => {
+        // Quem tem empresa (ou convite) escolhe com qual conta vai operar.
+        // Decide aqui, antes de "entrar": senão a tela de login redireciona
+        // para o início e as duas navegações disputam quem chega por último.
+        const [accounts, invites] = await Promise.all([
+          queryClient.fetchQuery({ queryKey: queryKeys.accounts, queryFn: listAccounts }),
+          queryClient.fetchQuery({ queryKey: queryKeys.invites, queryFn: listInvites }),
+        ]).catch(() => [[], []])
+        if (accounts.length > 1 || invites.length > 0) destination = '/contas'
+      })
+      navigate(destination, { replace: true })
     } catch (err) {
       setError(errorMessage(err))
     }

@@ -56,12 +56,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [endSession])
 
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (
+      email: string,
+      password: string,
+      beforeEnter?: () => Promise<void>,
+    ) => {
       const { access_token } = await requests.login({ email, password })
       setToken(access_token)
       // Cada login começa na conta pessoal
       setActiveAccountId(null)
       queryClient.clear()
+      await beforeEnter?.()
       setNotice(null)
       setTokenState(access_token)
     },
