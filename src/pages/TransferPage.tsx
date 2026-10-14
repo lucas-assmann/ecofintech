@@ -74,8 +74,9 @@ export function TransferPage() {
             execute={(key) => transfer(key, toRequestBody(step.values))}
             onBack={() => setStep({ name: 'form', values: step.values })}
             onDone={(result) => {
-              // Saldo e extrato mudaram
+              // Saldo e extrato mudaram (e os saldos da escolha de conta também)
               void queryClient.invalidateQueries({ queryKey: queryKeys.account })
+              void queryClient.invalidateQueries({ queryKey: queryKeys.accounts })
               void queryClient.invalidateQueries({
                 queryKey: queryKeys.transactions,
               })

@@ -10,8 +10,10 @@ import { listAccounts } from '../api/requests'
 import { queryKeys } from '../api/queries'
 import { useAuth } from './context'
 import {
+  ACCOUNT_CHANGED_EVENT,
   ACCOUNT_REVOKED_EVENT,
   getActiveAccountId,
+  revokeActiveAccount,
   setActiveAccountId,
 } from './account'
 import {
@@ -26,7 +28,11 @@ const ACCOUNT_INDEPENDENT = new Set(['me', 'accounts', 'invites'])
 export function AccountProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
-  const [activeId, setActiveId] = useState(getActiveAccountId)
+  // A conta ativa mora no sessionStorage (é ela que vai no cabeçalho
+  // X-Account-Id). Toda escrita passa por setActiveAccountId, que dispara um
+  // evento: este estado só espelha o valor guardado, então tela e cabeçalho
+  // nunca discordam (nem depois de sair e entrar de novo).
+  const [storedId, setStoredId] = useState(getActiveAccountId)
   const [revokedNotice, setRevokedNotice] = useState<string | null>(null)
 
   const accounts = useQuery({
@@ -49,32 +55,43 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     (id: string) => {
       const personal = accounts.data?.[0]
       // A pessoal é o padrão da API: não precisa de cabeçalho
-      const next = id === personal?.id ? null : id
-      setActiveAccountId(next)
-      setActiveId(next)
-      setRevokedNotice(null)
+      setActiveAccountId(id === personal?.id ? null : id)
       forgetAccountData()
     },
     [accounts.data, forgetAccountData],
   )
 
-  // A API respondeu "sem acesso" para a empresa escolhida
   useEffect(() => {
+    // Qualquer mudança (troca, logout, login) apaga o aviso antigo
+    const onChanged = () => {
+      setRevokedNotice(null)
+      setStoredId(getActiveAccountId())
+    }
+    // A API respondeu "sem acesso" para a empresa escolhida
     const onRevoked = () => {
-      setActiveId(null)
       setRevokedNotice(REVOKED_MESSAGE)
       forgetAccountData()
       void queryClient.invalidateQueries({ queryKey: queryKeys.accounts })
     }
+    window.addEventListener(ACCOUNT_CHANGED_EVENT, onChanged)
     window.addEventListener(ACCOUNT_REVOKED_EVENT, onRevoked)
-    return () => window.removeEventListener(ACCOUNT_REVOKED_EVENT, onRevoked)
+    return () => {
+      window.removeEventListener(ACCOUNT_CHANGED_EVENT, onChanged)
+      window.removeEventListener(ACCOUNT_REVOKED_EVENT, onRevoked)
+    }
   }, [forgetAccountData, queryClient])
 
-  // Saiu da sessão (logout/expirou): a próxima começa na pessoal
-  const currentId = user ? activeId : null
+  // A empresa escolhida sumiu da lista (ex.: foi removido): volta para a pessoal
+  useEffect(() => {
+    const id = getActiveAccountId()
+    if (user && accounts.data && id && !accounts.data.some((a) => a.id === id)) {
+      revokeActiveAccount()
+    }
+  }, [user, accounts.data])
 
   const value = useMemo<AccountContextValue>(() => {
     const list = accounts.data ?? []
+    const currentId = user ? storedId : null
     return {
       accounts: list,
       active: list.find((a) => a.id === currentId) ?? list[0] ?? null,
@@ -82,7 +99,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       switchTo,
       revokedNotice,
     }
-  }, [accounts.data, accounts.isPending, currentId, user, switchTo, revokedNotice])
+  }, [accounts.data, accounts.isPending, user, storedId, switchTo, revokedNotice])
 
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>
 }

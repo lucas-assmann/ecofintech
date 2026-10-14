@@ -45,6 +45,10 @@ export const useSummary = (days: requests.SummaryDays) =>
     placeholderData: keepPreviousData,
   })
 
+/** Contas com saldo atualizado: recarrega ao abrir a tela que usa */
+export const useAccounts = () =>
+  useQuery({ queryKey: queryKeys.accounts, queryFn: requests.listAccounts })
+
 export const useInvites = (enabled = true) =>
   useQuery({
     queryKey: queryKeys.invites,

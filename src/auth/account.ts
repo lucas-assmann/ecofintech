@@ -7,6 +7,9 @@ export const NO_ACCESS_MESSAGE = 'Sem acesso a esta conta'
 
 export const ACCOUNT_REVOKED_EVENT = 'ecofintech:account-revoked'
 
+/** Disparado sempre que a conta guardada muda (troca, logout, revogação) */
+export const ACCOUNT_CHANGED_EVENT = 'ecofintech:account-changed'
+
 /** Id da conta escolhida, ou null para a conta pessoal. */
 export function getActiveAccountId(): string | null {
   try {
@@ -23,6 +26,9 @@ export function setActiveAccountId(id: string | null): void {
   } catch {
     // Armazenamento indisponível: volta para a pessoal ao recarregar
   }
+  // O que vai no cabeçalho e o que aparece na tela vêm deste mesmo valor:
+  // quem mostra a conta ativa escuta o evento para se atualizar
+  window.dispatchEvent(new Event(ACCOUNT_CHANGED_EVENT))
 }
 
 /**

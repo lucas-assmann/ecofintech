@@ -1,9 +1,9 @@
-import { useId, useState, type FormEvent } from 'react'
+import { useEffect, useId, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
 import type { CompanyMembers } from '../../api/client'
-import { errorMessage } from '../../api/client'
+import { ApiError, errorMessage } from '../../api/client'
 import { queryKeys, useMembers } from '../../api/queries'
 import {
   cancelInvite,
@@ -30,6 +30,14 @@ export function CompanyPage() {
   const { active, accounts, loading, switchTo } = useActiveAccount()
   const { user } = useAuth()
   const members = useMembers(active?.kind === 'company' ? active.company_id : null)
+  const queryClient = useQueryClient()
+
+  // 403 aqui = a pessoa saiu ou foi removida da empresa: recarregar a lista de
+  // contas faz o AccountProvider voltar para a conta pessoal, com aviso
+  const removed = members.error instanceof ApiError && members.error.status === 403
+  useEffect(() => {
+    if (removed) void queryClient.invalidateQueries({ queryKey: queryKeys.accounts })
+  }, [removed, queryClient])
 
   // Ao recarregar a página, a lista de contas ainda está chegando: não dá
   // para saber se a conta ativa é uma empresa antes disso

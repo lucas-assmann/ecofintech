@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router'
 import type { OperableAccount } from '../api/client'
-import { useInvites } from '../api/queries'
+import { useAccounts, useInvites } from '../api/queries'
 import { useActiveAccount } from '../auth/account-context'
 import { formatCnpj, formatCpf, formatMoney } from '../lib/format'
 import { InviteList } from '../components/InviteList'
@@ -13,6 +13,8 @@ import { BuildingIcon, PlusIcon, UserIcon } from '../components/icons'
 export function AccountsPage() {
   const { accounts, active, loading, switchTo } = useActiveAccount()
   const invites = useInvites()
+  // Observar a lista aqui faz ela ser recarregada ao abrir a tela (saldos novos)
+  useAccounts()
   const navigate = useNavigate()
 
   const choose = (account: OperableAccount) => {
