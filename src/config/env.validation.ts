@@ -47,6 +47,12 @@ class EnvironmentVariables {
   @IsString()
   CORS_ORIGINS?: string;
 
+  /** Quantos proxies ficam na frente da API (0 em dev; ver main.ts) */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  TRUST_PROXY?: number;
+
   /** Endereço do front, usado nos links enviados por e-mail */
   @IsOptional()
   @Matches(/^https?:\/\/[^/]+$/, {

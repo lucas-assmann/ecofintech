@@ -14,9 +14,11 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator.js';
+import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import type { JwtPayload } from '../../common/guards/auth.guard.js';
 import { UsersService } from '../users/users.service.js';
@@ -37,17 +39,22 @@ export class AuthController {
   ) {}
 
   @Public()
+  @AuthThrottle()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Faz login e devolve o token de acesso' })
   @ApiOkResponse({ type: LoginResponseDto })
   @ApiUnauthorizedResponse({ description: 'E-mail ou senha inválidos' })
   @ApiForbiddenResponse({ description: 'Conta desativada' })
+  @ApiTooManyRequestsResponse({
+    description: 'Muitas tentativas; aguarde 1 minuto',
+  })
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
   }
 
   @Public()
+  @AuthThrottle()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -66,6 +73,7 @@ export class AuthController {
   }
 
   @Public()
+  @AuthThrottle()
   @Post('reset-password')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({

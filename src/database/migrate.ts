@@ -7,6 +7,13 @@ import pg from 'pg';
 
 const migrationsDir = path.join(import.meta.dirname, 'migrations');
 
+// Em dev as variáveis vêm do .env; em produção (Render), do ambiente
+try {
+  process.loadEnvFile();
+} catch {
+  // sem .env
+}
+
 const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
 await client.connect();
 

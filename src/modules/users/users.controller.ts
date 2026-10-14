@@ -24,6 +24,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator.js';
+import { AuthThrottle } from '../../common/decorators/auth-throttle.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import type { JwtPayload } from '../../common/guards/auth.guard.js';
@@ -40,6 +41,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Public()
+  @AuthThrottle()
   @Post()
   @ApiOperation({ summary: 'Cadastra um usuário (público)' })
   @ApiCreatedResponse({ type: User })

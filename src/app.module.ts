@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule, minutes } from '@nestjs/throttler';
 import { validateEnv } from './config/env.validation.js';
 import { AuthGuard } from './common/guards/auth.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
@@ -20,6 +21,12 @@ import { InvitesModule } from './modules/invites/invites.module.js';
   imports: [
     // validate: a API não sobe se o .env estiver incompleto ou inválido
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    // Limite geral por IP: 100 requisições por minuto (rotas sensíveis usam
+    // @AuthThrottle(), mais rígido). Contagem em memória, por instância da API.
+    ThrottlerModule.forRoot({
+      throttlers: [{ limit: 100, ttl: minutes(1) }],
+      errorMessage: 'Muitas tentativas. Aguarde um minuto e tente de novo.',
+    }),
     DatabaseModule,
     UsersModule,
     AccountsModule,
@@ -33,7 +40,9 @@ import { InvitesModule } from './modules/invites/invites.module.js';
   controllers: [AppController],
   providers: [
     AppService,
-    // Os guards rodam nesta ordem: primeiro o token, depois o perfil
+    // Os guards rodam nesta ordem: limite de requisições, token, perfil
+    // Recusa com 429 quem passou do limite, antes de qualquer outra checagem
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     // Protege todas as rotas por padrão; libere com @Public()
     { provide: APP_GUARD, useClass: AuthGuard },
     // Restringe por perfil as rotas marcadas com @Roles(...)

@@ -28,12 +28,15 @@ export class MailService {
     this.from =
       config.get<string>('MAIL_FROM') ??
       'Ecofintech <nao-responda@ecofintech.local>';
+    const port = Number(config.get<string>('SMTP_PORT') ?? 587);
     this.transporter = host
       ? createTransport({
           host,
-          port: Number(config.get<string>('SMTP_PORT') ?? 587),
-          // Porta 465 usa TLS direto; as outras sobem para TLS se o servidor oferecer
-          secure: Number(config.get<string>('SMTP_PORT')) === 465,
+          port,
+          // 465 e 2465 (alternativa do Resend, já que o Render bloqueia as
+          // portas SMTP padrão) usam TLS direto; as outras sobem para TLS
+          // se o servidor oferecer
+          secure: port === 465 || port === 2465,
           auth: user
             ? { user, pass: config.get<string>('SMTP_PASS') }
             : undefined,
