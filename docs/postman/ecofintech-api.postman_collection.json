@@ -93,6 +93,22 @@
     {
       "key": "reset_token",
       "value": ""
+    },
+    {
+      "key": "company_cnpj",
+      "value": ""
+    },
+    {
+      "key": "company_id",
+      "value": ""
+    },
+    {
+      "key": "company_account_id",
+      "value": ""
+    },
+    {
+      "key": "invite_id",
+      "value": ""
     }
   ],
   "item": [
@@ -1152,6 +1168,521 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('200 recusada, 409 já avaliada', () => pm.expect(pm.response.code).to.be.oneOf([200, 409]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Companies & invites",
+      "description": "Contas de empresa. Aqui o **admin** abre uma empresa (é o dono) e convida o usuário de teste, que aceita, opera a conta da empresa com o cabeçalho `X-Account-Id` e depois sai. Puladas se `admin_token` estiver vazio.\n\nCada execução cria uma empresa nova (CNPJ gerado) com o admin como dono.",
+      "item": [
+        {
+          "name": "Abrir empresa (admin é o dono)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/companies",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cnpj\": \"{{company_cnpj}}\",\n  \"legal_name\": \"Empresa de Teste LTDA\",\n  \"trade_name\": \"Empresa de Teste\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Abre uma empresa: quem abre vira o dono e a conta é criada na hora. CNPJ com ou sem pontuação.\n\nErros: 400 (CNPJ ou nomes inválidos), 409 (CNPJ já cadastrado)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const base = Array.from({ length: 12 }, (_, i) => (i < 8 ? Math.floor(Math.random() * 10) : [0, 0, 0, 1][i - 8]));",
+                  "const digit = (nums) => {",
+                  "  const weights = nums.length === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];",
+                  "  const rest = nums.reduce((acc, n, i) => acc + n * weights[i], 0) % 11;",
+                  "  return rest < 2 ? 0 : 11 - rest;",
+                  "};",
+                  "const first = digit(base);",
+                  "pm.collectionVariables.set('company_cnpj', [...base, first, digit([...base, first])].join(''));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const account = pm.response.json();",
+                  "pm.test('Admin é o dono', () => pm.expect(account.role).to.eql('owner'));",
+                  "pm.collectionVariables.set('company_id', account.company_id);",
+                  "pm.collectionVariables.set('company_account_id', account.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Convidar usuário de teste (dono)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/companies/{{company_id}}/invites",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"{{user_cpf}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Convida alguém já cadastrado por `email` ou `cpf` (só um). Somente o dono.\n\nErros: 400, 403 (não é o dono), 404 (usuário não encontrado), 409 (já é membro ou já tem convite pendente), 422 (si mesmo ou usuário desativado)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Meus convites",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/invites",
+            "description": "Convites pendentes do usuário logado."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const invite = pm.response.json().find((i) => i.company.id === pm.collectionVariables.get('company_id'));",
+                  "pm.test('Convite da empresa de teste', () => pm.expect(invite).to.exist);",
+                  "if (invite) pm.collectionVariables.set('invite_id', invite.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Aceitar convite",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/invites/{{invite_id}}/accept",
+            "description": "Aceita o convite e entra na empresa como membro.\n\nErros: 404 (não é dele ou já respondido)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Membros da empresa",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/companies/{{company_id}}/members",
+            "description": "Membros da empresa (qualquer membro vê). Os convites pendentes só aparecem para o dono."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Dono primeiro, depois o usuário de teste', () => { pm.expect(body.members[0].role).to.eql('owner'); pm.expect(body.members.map((m) => m.email)).to.include(pm.collectionVariables.get('user_email')); });",
+                  "pm.test('Membro não vê convites', () => pm.expect(body.invites).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extrato da empresa (X-Account-Id)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Account-Id",
+                "value": "{{company_account_id}}"
+              }
+            ],
+            "url": "{{base_url}}/transactions?limit=10&offset=0",
+            "description": "Com o cabeçalho `X-Account-Id`, as rotas de conta, extrato, resumo e transferência usam a conta indicada (pessoal ou de empresa da qual a pessoa é membro). Sem acesso: 403 \"Sem acesso a esta conta\"."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sair da empresa",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/companies/{{company_id}}/leave",
+            "description": "O membro sai da empresa. O dono não pode sair (422)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extrato da empresa depois de sair (403)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Account-Id",
+                "value": "{{company_account_id}}"
+              }
+            ],
+            "url": "{{base_url}}/transactions?limit=10&offset=0",
+            "description": "Quem saiu (ou foi removido) perde o acesso na hora."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Mensagem', () => pm.expect(pm.response.json().message).to.eql('Sem acesso a esta conta'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Convidar de novo (dono)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/companies/{{company_id}}/invites",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Membros e convites (dono)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/companies/{{company_id}}/members"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const invites = pm.response.json().invites;",
+                  "pm.test('Dono vê o convite pendente', () => pm.expect(invites).to.have.length(1));",
+                  "if (invites.length) pm.collectionVariables.set('invite_id', invites[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancelar convite (dono)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/companies/{{company_id}}/invites/{{invite_id}}",
+            "description": "Cancela um convite pendente. Somente o dono. Erros: 403, 404 (não está pendente)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
                 ]
               }
             }

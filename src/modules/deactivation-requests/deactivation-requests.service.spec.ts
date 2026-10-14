@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import { Prisma } from '../../database/generated/prisma/client.js';
 import {
@@ -40,6 +44,7 @@ describe('DeactivationRequestsService', () => {
       findFirst: vi.fn(),
       findMany: vi.fn(),
     },
+    company_members: { findFirst: vi.fn() },
     $transaction: vi.fn(),
   };
 
@@ -61,6 +66,37 @@ describe('DeactivationRequestsService', () => {
   });
 
   describe('create', () => {
+    it('dono de empresa ativa não pode pedir desativação (a empresa ficaria sem dono)', async () => {
+      prisma.company_members.findFirst.mockResolvedValue({
+        companies: { trade_name: 'Padaria Pão Bom' },
+      });
+
+      await expect(service.create('user-1', {})).rejects.toThrow(
+        new UnprocessableEntityException(
+          'Você é dono da empresa Padaria Pão Bom. Ela não pode ficar sem dono.',
+        ),
+      );
+      expect(prisma.company_members.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            user_id: 'user-1',
+            role: 'owner',
+            companies: { status: 'active' },
+          },
+        }),
+      );
+      expect(prisma.deactivation_requests.create).not.toHaveBeenCalled();
+    });
+
+    it('quem não é dono de empresa ativa segue o fluxo normal', async () => {
+      prisma.company_members.findFirst.mockResolvedValue(null);
+      prisma.deactivation_requests.create.mockResolvedValue(selected());
+
+      await service.create('user-1', {});
+
+      expect(prisma.deactivation_requests.create).toHaveBeenCalled();
+    });
+
     it('cria a solicitação e devolve a mensagem do suporte', async () => {
       prisma.deactivation_requests.create.mockResolvedValue(selected());
 

@@ -135,6 +135,22 @@ Rotas exclusivas de admin: `GET /users` (listar todos), `DELETE /users/:id` (rem
 
 Cada decisão registra quem avaliou (`reviewed_by`), quando e a observação.
 
+**Dono de empresa:** quem é dono de uma empresa ativa não pode pedir a desativação da conta pessoal (`422`), porque a empresa ficaria sem dono.
+
+## Contas de empresa
+
+O login é sempre da **pessoa**. Com ele, a pessoa opera a conta pessoal e as contas das empresas (CNPJ) das quais participa.
+
+- **Abrir:** `POST /companies` (`cnpj`, `legal_name` = razão social, `trade_name` = nome fantasia). Quem abre vira o **dono** e a conta da empresa é criada na hora. CNPJ validado e único (`409` se já cadastrado).
+- **Conta ativa:** o front envia o cabeçalho `X-Account-Id` com o id da conta escolhida. Sem ele, vale a conta pessoal. `GET /accounts/me`, `GET /transactions`, `GET /transactions/summary`, `GET /transactions/:id` e `POST /transactions/transfer` usam a conta ativa. O acesso é conferido **a cada requisição**: quem sai ou é removido de uma empresa perde o acesso na hora (`403` "Sem acesso a esta conta").
+- **Minhas contas:** `GET /accounts` lista a pessoal e as empresas (com o papel), para a tela de escolha de conta.
+- **Papéis:** `owner` (um por empresa) e `member`. Todo membro movimenta a conta; só o dono convida, cancela convites e remove membros.
+- **Convites (dono):** `POST /companies/:id/invites` (por `email` ou `cpf` de quem já tem conta), `DELETE /companies/:id/invites/:inviteId`, `DELETE /companies/:id/members/:userId`. `GET /companies/:id/members` mostra os membros (e, para o dono, os convites pendentes).
+- **Convites (convidado):** `GET /invites`, `POST /invites/:id/accept`, `POST /invites/:id/decline`. Membro sai com `POST /companies/:id/leave` (o dono não pode sair).
+- **Auditoria:** abrir empresa, convidar, cancelar, entrar, remover e sair ficam em `audit_logs` (`company.*`).
+
+Tabelas: `companies`, `company_members` (um único `owner` por empresa, garantido por índice), `company_invites` (um convite pendente por pessoa em cada empresa) e `accounts`, que pertence a uma pessoa (`user_id`) **ou** a uma empresa (`company_id`).
+
 ## Saldo e movimentações
 
 ```
