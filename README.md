@@ -160,7 +160,8 @@ users 1───1 accounts (balance) 1───N transactions
 - **Conta:** criada automaticamente no cadastro, com saldo 0. `GET /accounts/me` devolve o saldo.
 - **Movimentações** (`transactions`): cada linha é um lançamento em uma conta, com `type` (`entrada` | `saida`), `category` (`deposito` | `transferencia`), `amount` e `balance_after` (saldo logo após o lançamento).
   - `POST /transactions/deposit` (**somente admin**): dinheiro entrando de fora. Gera uma `entrada`.
-  - `POST /transactions/transfer`: do usuário logado para outro, identificado por `to_email` **ou** `to_cpf` (nunca os dois). Gera uma `saida` na origem e uma `entrada` no destino.
+  - `POST /transactions/transfer`: da conta ativa para outra conta, identificada por `to_email` ou `to_cpf` (pessoa) **ou** `to_cnpj` (empresa) — exatamente um. Gera uma `saida` na origem e uma `entrada` no destino. O depósito do admin aceita os mesmos campos.
+  - Cada lançamento traz `counterparty` (`{ name, email, kind }`: `kind` é `person` ou `company`; empresa aparece pelo nome fantasia e `email` nulo) e `operator`: o nome de quem fez a operação, preenchido só em transferências **enviadas pela conta de uma empresa** ("feita por Maria").
   - Depósito e transferência para conta desativada são recusados (`422`).
   - `POST /transactions/:id/reverse` (**somente admin**): estorno. Lança o movimento inverso com `category: "estorno"` e `reversal_of` apontando para o original. Estornar qualquer ponta de uma transferência desfaz as duas. Cada lançamento só pode ser estornado uma vez (`409`), estorno não se estorna (`422`) e é preciso saldo na conta que devolve (`422`).
   - `GET /transactions` (extrato, com `limit`/`offset`) e `GET /transactions/:id`.

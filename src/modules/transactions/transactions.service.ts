@@ -20,12 +20,19 @@ import { ListAllTransactionsQueryDto } from './dto/list-all-transactions.query.d
 import { SummaryQueryDto } from './dto/summary.query.dto.js';
 import {
   AdminTransaction,
+  Counterparty,
   Transaction,
 } from './entities/transaction.entity.js';
 import { TransactionSummary } from './entities/transaction-summary.entity.js';
 
 /** Fuso usado para dizer "que dia é" um lançamento (Brasil, sem horário de verão) */
 const TIME_ZONE = 'America/Sao_Paulo';
+
+/** Dono de uma conta: uma pessoa ou uma empresa (só um dos dois vem preenchido) */
+const accountOwnerSelect = {
+  users: { select: { name: true, email: true } },
+  companies: { select: { trade_name: true } },
+} satisfies Prisma.accountsSelect;
 
 const transactionSelect = {
   id: true,
@@ -38,8 +45,14 @@ const transactionSelect = {
   created_at: true,
   // Relação com a conta da contraparte (nome gerado pelo db pull)
   accounts_transactions_counterparty_account_idToaccounts: {
-    select: { users: { select: { name: true, email: true } } },
+    select: accountOwnerSelect,
   },
+  // A própria conta do lançamento: de pessoa ou de empresa?
+  accounts_transactions_account_idToaccounts: {
+    select: { company_id: true, ...accountOwnerSelect },
+  },
+  // Quem fez a operação (created_by)
+  users: { select: { name: true } },
 } satisfies Prisma.transactionsSelect;
 
 type SelectedTransaction = Prisma.transactionsGetPayload<{
@@ -392,14 +405,27 @@ export class TransactionsService {
     if (search) {
       // CPF é guardado só com dígitos: "123.456" vira "123456"
       const digits = search.replace(/\D/g, '');
+      // O dono da conta pode ser uma pessoa ou uma empresa
       where.accounts_transactions_account_idToaccounts = {
-        users: {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' } },
-            { email: { contains: search, mode: 'insensitive' } },
-            ...(digits ? [{ cpf: { contains: digits } }] : []),
-          ],
-        },
+        OR: [
+          {
+            users: {
+              OR: [
+                { name: { contains: search, mode: 'insensitive' } },
+                { email: { contains: search, mode: 'insensitive' } },
+                ...(digits ? [{ cpf: { contains: digits } }] : []),
+              ],
+            },
+          },
+          {
+            companies: {
+              OR: [
+                { trade_name: { contains: search, mode: 'insensitive' } },
+                ...(digits ? [{ cnpj: { contains: digits } }] : []),
+              ],
+            },
+          },
+        ],
       };
     }
 
@@ -408,25 +434,12 @@ export class TransactionsService {
       orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
       take: query.limit,
       skip: query.offset,
-      select: {
-        ...transactionSelect,
-        accounts_transactions_account_idToaccounts: {
-          select: {
-            users: { select: { name: true, email: true } },
-            companies: { select: { trade_name: true } },
-          },
-        },
-      },
+      select: transactionSelect,
     });
-    return entries.map(
-      ({ accounts_transactions_account_idToaccounts: account, ...entry }) =>
-        Object.assign(toTransaction(entry), {
-          // Conta de empresa: o dono é a empresa (sem e-mail próprio)
-          owner: account.users ?? {
-            name: account.companies?.trade_name ?? '',
-            email: '',
-          },
-        }),
+    return entries.map((entry) =>
+      Object.assign(toTransaction(entry), {
+        owner: toOwner(entry.accounts_transactions_account_idToaccounts)!,
+      }),
     );
   }
 
@@ -577,27 +590,33 @@ async function applyMoves(
   return balances;
 }
 
-/** Conta de quem vai receber, identificada por to_email ou to_cpf. */
+/** Conta de quem vai receber: pessoa por to_email/to_cpf ou empresa por to_cnpj. */
 async function findRecipientAccountId(
   client: Client,
   dto: TransferDto,
 ): Promise<string> {
-  if (!dto.to_email === !dto.to_cpf) {
+  const informed = [dto.to_email, dto.to_cpf, dto.to_cnpj].filter(Boolean);
+  if (informed.length !== 1) {
     throw new BadRequestException(
-      'Informe o destinatário por to_email ou to_cpf (apenas um dos dois)',
+      'Informe o destinatário por to_email, to_cpf ou to_cnpj (apenas um)',
     );
   }
   const account = await client.accounts.findFirst({
-    where: {
-      users: dto.to_email
-        ? { email: dto.to_email.toLowerCase() }
-        : { cpf: dto.to_cpf },
+    where: dto.to_cnpj
+      ? { companies: { cnpj: dto.to_cnpj } }
+      : {
+          users: dto.to_email
+            ? { email: dto.to_email.toLowerCase() }
+            : { cpf: dto.to_cpf },
+        },
+    select: {
+      id: true,
+      users: { select: { status: true } },
+      companies: { select: { status: true } },
     },
-    select: { id: true, users: { select: { status: true } } },
   });
   if (!account) throw new NotFoundException('Destinatário não encontrado');
-  // A busca é por e-mail/CPF de uma pessoa: a conta encontrada é pessoal
-  if (account.users!.status !== 'active') {
+  if ((account.users ?? account.companies)?.status !== 'active') {
     throw new UnprocessableEntityException('Conta de destino desativada');
   }
   return account.id;
@@ -617,15 +636,41 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
+type AccountOwner = Prisma.accountsGetPayload<{
+  select: typeof accountOwnerSelect;
+}>;
+
+/** Pessoa ou empresa dona de uma conta, no formato da API. */
+function toOwner(account: AccountOwner | null): Counterparty | null {
+  if (!account) return null;
+  if (account.companies) {
+    return { name: account.companies.trade_name, email: null, kind: 'company' };
+  }
+  return {
+    name: account.users!.name,
+    email: account.users!.email,
+    kind: 'person',
+  };
+}
+
 function toTransaction(entry: SelectedTransaction): Transaction {
   const {
     accounts_transactions_counterparty_account_idToaccounts: counterparty,
+    accounts_transactions_account_idToaccounts: account,
+    users: author,
     ...rest
   } = entry;
+  // "Feita por" só faz sentido quando um membro da empresa pagou: nas entradas
+  // quem fez é de fora, e estornos são feitos pelo admin
+  const paidByMember =
+    account.company_id !== null &&
+    entry.type === 'saida' &&
+    entry.category === 'transferencia';
   return {
     ...rest,
     amount: entry.amount.toFixed(2),
     balance_after: entry.balance_after.toFixed(2),
-    counterparty: counterparty?.users ?? null,
+    counterparty: toOwner(counterparty),
+    operator: paidByMember ? { name: author.name } : null,
   };
 }

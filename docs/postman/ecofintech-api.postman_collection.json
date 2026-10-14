@@ -109,6 +109,14 @@
     {
       "key": "invite_id",
       "value": ""
+    },
+    {
+      "key": "cnpj_transfer_key",
+      "value": ""
+    },
+    {
+      "key": "company_transfer_key",
+      "value": ""
     }
   ],
   "item": [
@@ -1467,6 +1475,144 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transferir para a empresa (CNPJ)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{cnpj_transfer_key}}"
+              }
+            ],
+            "url": "{{base_url}}/transactions/transfer",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to_cnpj\": \"{{company_cnpj}}\",\n  \"amount\": 5,\n  \"description\": \"Pagamento à empresa\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Da conta pessoal do usuário de teste para a empresa, pelo CNPJ (com ou sem pontuação). Informe só um entre `to_email`, `to_cpf` e `to_cnpj`."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('cnpj_transfer_key', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Contraparte é a empresa', () => pm.expect(pm.response.json().counterparty.kind).to.eql('company'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transferir pela conta da empresa (\"feita por\")",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{company_transfer_key}}"
+              },
+              {
+                "key": "X-Account-Id",
+                "value": "{{company_account_id}}"
+              }
+            ],
+            "url": "{{base_url}}/transactions/transfer",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to_email\": \"{{admin_email}}\",\n  \"amount\": 2,\n  \"description\": \"Pago pela empresa\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Um membro paga pela conta da empresa (cabeçalho `X-Account-Id`). O lançamento de saída traz `operator` com o nome de quem fez; quem recebe vê a empresa como remetente."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('company_transfer_key', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Feita pelo usuário de teste', () => pm.expect(pm.response.json().operator).to.have.property('name'));"
                 ]
               }
             }

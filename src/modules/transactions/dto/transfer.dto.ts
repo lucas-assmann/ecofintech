@@ -8,11 +8,12 @@ import {
   Min,
 } from 'class-validator';
 import { IsCpf, OnlyDigits } from '../../../common/validators/cpf.js';
+import { IsCnpj } from '../../../common/validators/cnpj.js';
 
-// Quem recebe é identificado por to_email OU to_cpf (exatamente um dos dois)
+// Quem recebe é identificado por to_email, to_cpf OU to_cnpj (exatamente um)
 export class TransferDto {
   /**
-   * E-mail de quem vai receber. Informe este ou `to_cpf`.
+   * E-mail de quem vai receber. Informe só um entre `to_email`, `to_cpf` e `to_cnpj`.
    * @example "fulano@email.com"
    */
   @IsOptional()
@@ -20,13 +21,22 @@ export class TransferDto {
   to_email?: string;
 
   /**
-   * CPF de quem vai receber, com ou sem pontuação. Informe este ou `to_email`.
+   * CPF de quem vai receber, com ou sem pontuação.
    * @example "529.982.247-25"
    */
   @IsOptional()
   @OnlyDigits()
   @IsCpf()
   to_cpf?: string;
+
+  /**
+   * CNPJ da empresa que vai receber, com ou sem pontuação.
+   * @example "11.222.333/0001-81"
+   */
+  @IsOptional()
+  @OnlyDigits()
+  @IsCnpj()
+  to_cnpj?: string;
 
   /**
    * Valor em reais, com no máximo 2 casas decimais

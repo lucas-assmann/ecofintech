@@ -4,12 +4,29 @@ import {
   transaction_type,
 } from '../../../database/generated/prisma/enums.js';
 
+/** Pessoa ou empresa do outro lado da movimentação (ou dona da conta, no admin). */
 export class Counterparty {
-  /** @example "Fulano de Tal" */
+  /**
+   * Nome da pessoa ou nome fantasia da empresa
+   * @example "Fulano de Tal"
+   */
   name: string;
 
-  /** @example "fulano@email.com" */
-  email: string;
+  /**
+   * E-mail da pessoa (null quando é uma empresa)
+   * @example "fulano@email.com"
+   */
+  @ApiProperty({ type: String, nullable: true })
+  email: string | null;
+
+  @ApiProperty({ enum: ['person', 'company'] })
+  kind: 'person' | 'company';
+}
+
+/** Quem fez a operação pela conta da empresa. */
+export class Operator {
+  /** @example "Maria Silva" */
+  name: string;
 }
 
 /** Lançamento do extrato como devolvido pela API. */
@@ -51,11 +68,18 @@ export class Transaction {
   /** Em estornos: id do lançamento que foi estornado (null nos demais) */
   reversal_of: string | null;
 
+  /**
+   * Quem fez a operação. Só em transferências enviadas pela conta de uma
+   * empresa (para saber qual membro pagou); null nos demais.
+   */
+  @ApiProperty({ type: Operator, nullable: true })
+  operator: Operator | null;
+
   created_at: Date;
 }
 
 /** Lançamento na listagem geral do admin: inclui o dono da conta. */
 export class AdminTransaction extends Transaction {
-  /** Dono da conta em que o lançamento foi feito */
+  /** Dono da conta em que o lançamento foi feito (pessoa ou empresa) */
   owner: Counterparty;
 }
