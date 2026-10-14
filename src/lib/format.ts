@@ -42,6 +42,16 @@ export function formatCpf(value: string): string {
     .replace(/\.(\d{3})(\d)/, '.$1-$2')
 }
 
+/** Formata o CNPJ enquanto digita: "11222333000181" → "11.222.333/0001-81" */
+export function formatCnpj(value: string): string {
+  const d = onlyDigits(value).slice(0, 14)
+  return d
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1/$2')
+    .replace(/(\d{4})(\d)/, '$1-$2')
+}
+
 /** CPF parcialmente oculto, para exibir em listas: "***.982.247-**" */
 export function maskCpf(value: string): string {
   const formatted = formatCpf(value)

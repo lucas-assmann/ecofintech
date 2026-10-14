@@ -1,4 +1,5 @@
-export function Logo({ light = false }: { light?: boolean }) {
+/** compact: no celular mostra só o ícone (o nome aparece a partir de sm) */
+export function Logo({ light = false, compact = false }: { light?: boolean; compact?: boolean }) {
   return (
     <span className="inline-flex items-center gap-2">
       <svg viewBox="0 0 32 32" className="size-8" aria-hidden="true">
@@ -20,7 +21,7 @@ export function Logo({ light = false }: { light?: boolean }) {
         />
       </svg>
       <span
-        className={`text-lg font-bold tracking-tight ${light ? 'text-white' : 'text-slate-900 dark:text-slate-100'}`}
+        className={`text-lg font-bold tracking-tight ${light ? 'text-white' : 'text-slate-900 dark:text-slate-100'} ${compact ? 'hidden sm:inline' : ''}`}
       >
         Ecofintech
       </span>

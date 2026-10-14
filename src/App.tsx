@@ -13,6 +13,7 @@ import { AdminDeactivationsPage } from './pages/admin/AdminDeactivationsPage'
 import { AdminReversalPage } from './pages/admin/AdminReversalPage'
 import { AdminTransactionsPage } from './pages/admin/AdminTransactionsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { AccountsPage } from './pages/AccountsPage'
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage'
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage'
 
@@ -36,6 +37,7 @@ export function App() {
           <Route path="transferir" element={<TransferPage />} />
           <Route path="extrato" element={<StatementPage />} />
           <Route path="perfil" element={<ProfilePage />} />
+          <Route path="contas" element={<AccountsPage />} />
 
           {/* Exigem perfil de administrador */}
           <Route path="admin" element={<RequireAdmin />}>

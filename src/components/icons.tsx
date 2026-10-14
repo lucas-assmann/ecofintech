@@ -111,3 +111,21 @@ export const TrendDownIcon = (p: SVGProps<SVGSVGElement>) => (
     <path d="m3 7 6 6 4-4 8 8M15 17h6v-6" />
   </Icon>
 )
+
+export const BuildingIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M16 9h2a2 2 0 0 1 2 2v10M3 21h18M8 7h4M8 11h4M8 15h4" />
+  </Icon>
+)
+
+export const BellIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10.3 20a1.9 1.9 0 0 0 3.4 0" />
+  </Icon>
+)
+
+export const ChevronDownIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <path d="m6 9 6 6 6-6" />
+  </Icon>
+)
