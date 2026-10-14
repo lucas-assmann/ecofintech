@@ -34,6 +34,7 @@ Variáveis do `.env` (a API valida todas ao iniciar e avisa o que estiver faltan
 | `SMTP_HOST` / `SMTP_PORT` | Servidor de e-mail (sem `SMTP_HOST`, o e-mail é só escrito no terminal da API) | `localhost` / `1025` |
 | `SMTP_USER` / `SMTP_PASS` | Login do servidor de e-mail, se ele exigir | |
 | `MAIL_FROM` | Remetente | `Ecofintech <nao-responda@ecofintech.local>` |
+| `TRUST_PROXY` | Quantos proxies ficam na frente da API, para o limite de requisições enxergar o IP real (opcional; `0` em dev) | `1` |
 
 ### E-mails em desenvolvimento (Mailpit)
 
@@ -44,7 +45,7 @@ winget install axllent.mailpit   # uma vez
 mailpit                          # SMTP na porta 1025, caixa de entrada em http://localhost:8025
 ```
 
-Em produção, basta apontar `SMTP_*` para um provedor de verdade (Gmail, Resend, SES...).
+Em produção, basta apontar `SMTP_*` para um provedor de verdade (Gmail, Resend, SES...). No Render as portas SMTP padrão (25, 465, 587) são bloqueadas; com o Resend use `smtp.resend.com` na porta `2465`.
 
 ## Banco de dados
 
@@ -102,6 +103,16 @@ Cada token carrega a versão (`ver`) dos tokens do usuário no momento do login;
 - ter a conta desativada.
 
 Nesses casos, e também com token expirado ou inválido, a API responde **401 "Sessão expirada. Faça login novamente."**. **No front: ao receber 401 em qualquer rota, apague o token e volte para a tela de login.** Login de conta desativada responde `403 Conta desativada`.
+
+### Limite de requisições
+
+Para dificultar ataques de força bruta (`@nestjs/throttler`, guard global em `src/app.module.ts`):
+
+- Cada IP pode fazer até **100 requisições por minuto** em qualquer rota.
+- As rotas públicas sensíveis (`POST /auth/login`, `POST /users`, `POST /auth/forgot-password` e `POST /auth/reset-password`) usam `@AuthThrottle()`: **5 por minuto**.
+- Quem passa do limite recebe **429 "Muitas tentativas. Aguarde um minuto e tente de novo."**
+
+A contagem fica na memória do processo: se a API rodar em várias instâncias, cada uma conta separado.
 
 ### CORS
 

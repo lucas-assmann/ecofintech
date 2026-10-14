@@ -1,10 +1,16 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Em produção a API fica atrás do proxy da hospedagem: sem isto, todo
+  // mundo pareceria vir do IP do proxy e dividiria o mesmo limite de
+  // requisições. TRUST_PROXY = quantos proxies há na frente (0 = nenhum).
+  app.set('trust proxy', Number(process.env.TRUST_PROXY ?? 0));
 
   // CORS: só os endereços do front listados em CORS_ORIGINS podem chamar a API
   // pelo navegador. O token vai no header Authorization (sem cookies).
