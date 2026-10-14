@@ -208,6 +208,13 @@ Com a API rodando:
 
 A documentação é gerada a partir do código: o plugin `@nestjs/swagger` (em `nest-cli.json`) lê os DTOs e os comentários JSDoc automaticamente. Para detalhar uma rota, use decorators como `@ApiTags`, `@ApiOperation` e `@ApiOkResponse` (veja `src/app.controller.ts`).
 
+## Deploy (Render + Neon)
+
+- **Build command:** `npm ci --include=dev && npm run build && npm run db:migrate`. O `--include=dev` é necessário porque, com `NODE_ENV=production`, o `npm ci` pula as devDependencies, e a CLI do Nest (`nest build`) está nelas.
+- **Start command:** `npm run start:prod`. **Health check:** `/`.
+- `DATABASE_URL` do Neon com `sslmode=verify-full`. As migrations rodam a cada deploy; as já aplicadas são puladas.
+- Variáveis de produção: as da tabela acima, com `NODE_ENV=production`, `TRUST_PROXY`, `CORS_ORIGINS`/`APP_URL` com o endereço do front, e `SMTP_*` do Resend (porta `2465`).
+
 ## Testes e qualidade
 
 ```bash
