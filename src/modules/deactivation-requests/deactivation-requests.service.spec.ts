@@ -37,6 +37,7 @@ describe('DeactivationRequestsService', () => {
     deactivation_requests: { findUnique: vi.fn(), update: vi.fn() },
     accounts: { findUnique: vi.fn() },
     users: { update: vi.fn() },
+    company_members: { findFirst: vi.fn() },
   };
   const prisma = {
     deactivation_requests: {
@@ -121,6 +122,23 @@ describe('DeactivationRequestsService', () => {
   });
 
   describe('approve', () => {
+    it('não aprova se a pessoa virou dona de empresa ativa depois do pedido', async () => {
+      tx.deactivation_requests.findUnique.mockResolvedValue({
+        user_id: 'user-1',
+        status: 'pending',
+      });
+      tx.company_members.findFirst.mockResolvedValue({
+        companies: { trade_name: 'Padaria Pão Bom' },
+      });
+
+      await expect(service.approve('admin-1', 'req-1', {})).rejects.toThrow(
+        new UnprocessableEntityException(
+          'Você é dono da empresa Padaria Pão Bom. Ela não pode ficar sem dono.',
+        ),
+      );
+      expect(tx.users.update).not.toHaveBeenCalled();
+    });
+
     it('desativa o usuário, derruba as sessões e registra quem aprovou', async () => {
       tx.deactivation_requests.findUnique.mockResolvedValue({
         user_id: 'user-1',
