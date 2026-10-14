@@ -227,6 +227,7 @@ function InviteCard({
             onChange={setValue}
             invalid={invalid !== null}
             describedBy={invalid ? `${id}-error` : undefined}
+            modes={['email', 'cpf']}
           />
           {invalid && (
             <p id={`${id}-error`} className="text-sm text-red-600 dark:text-red-400">

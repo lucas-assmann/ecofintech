@@ -4,6 +4,7 @@ import { useAuth } from '../auth/context'
 import type { Transaction } from '../api/client'
 import { errorMessage } from '../api/client'
 import { queryKeys, useAccount } from '../api/queries'
+import { useActiveAccount } from '../auth/account-context'
 import { transfer } from '../api/requests'
 import { onlyDigits } from '../lib/format'
 import {
@@ -24,6 +25,7 @@ type Step =
 export function TransferPage() {
   const { user } = useAuth()
   const account = useAccount()
+  const { active } = useActiveAccount()
   const queryClient = useQueryClient()
   const [step, setStep] = useState<Step>({ name: 'form' })
 
@@ -37,7 +39,7 @@ export function TransferPage() {
     <div className="mx-auto max-w-lg">
       <PageHeader
         title="Transferir"
-        description="Envie dinheiro para outra conta Ecofintech pelo e-mail ou CPF."
+        description="Envie dinheiro para outra conta Ecofintech pelo e-mail, CPF ou CNPJ."
       />
       <Card title={titles[step.name] || undefined}>
         {account.isPending ? (
@@ -50,17 +52,24 @@ export function TransferPage() {
             maxAmount={Number(account.data.balance)}
             submitLabel="Continuar"
             validateRecipient={(values) => {
+              // Bloqueia só a mesma conta: pela empresa, pagar a conta pessoal
+              // de quem opera é permitido (e vice-versa)
               const self =
-                values.mode === 'email'
-                  ? values.recipient.toLowerCase() === user?.email
-                  : onlyDigits(values.recipient) === user?.cpf
-              return self ? 'Não é possível transferir para você mesmo' : null
+                active?.kind === 'company'
+                  ? values.mode === 'cnpj' &&
+                    onlyDigits(values.recipient) === active.document
+                  : values.mode === 'email'
+                    ? values.recipient.toLowerCase() === user?.email
+                    : values.mode === 'cpf' &&
+                      onlyDigits(values.recipient) === user?.cpf
+              return self ? 'Não é possível transferir para a própria conta' : null
             }}
             onSubmit={(values) => setStep({ name: 'confirm', values })}
           />
         ) : step.name === 'confirm' ? (
           <ConfirmOperation
             values={step.values}
+            from={active?.name}
             confirmLabel="Confirmar transferência"
             execute={(key) => transfer(key, toRequestBody(step.values))}
             onBack={() => setStep({ name: 'form', values: step.values })}

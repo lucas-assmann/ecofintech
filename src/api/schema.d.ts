@@ -688,15 +688,20 @@ export interface components {
         DepositDto: {
             /**
              * Format: email
-             * @description E-mail de quem vai receber. Informe este ou `to_cpf`.
+             * @description E-mail de quem vai receber. Informe só um entre `to_email`, `to_cpf` e `to_cnpj`.
              * @example fulano@email.com
              */
             to_email?: string;
             /**
-             * @description CPF de quem vai receber, com ou sem pontuação. Informe este ou `to_email`.
+             * @description CPF de quem vai receber, com ou sem pontuação.
              * @example 529.982.247-25
              */
             to_cpf?: string;
+            /**
+             * @description CNPJ da empresa que vai receber, com ou sem pontuação.
+             * @example 11.222.333/0001-81
+             */
+            to_cnpj?: string;
             /**
              * @description Valor em reais, com no máximo 2 casas decimais
              * @example 200
@@ -715,16 +720,33 @@ export interface components {
         transaction_type: "entrada" | "saida";
         /** @enum {string} */
         transaction_category: "deposito" | "transferencia" | "estorno";
-        Counterparty: {
-            /** @example Fulano de Tal */
+        Operator: {
+            /** @example Maria Silva */
             name: string;
-            /** @example fulano@email.com */
-            email: string;
+        };
+        Counterparty: {
+            /**
+             * @description E-mail da pessoa (null quando é uma empresa)
+             * @example fulano@email.com
+             */
+            email: string | null;
+            /** @enum {string} */
+            kind: "person" | "company";
+            /**
+             * @description Nome da pessoa ou nome fantasia da empresa
+             * @example Fulano de Tal
+             */
+            name: string;
         };
         Transaction: {
             /** @description entrada (dinheiro chegou) ou saida (dinheiro saiu) */
             type: components["schemas"]["transaction_type"];
             category: components["schemas"]["transaction_category"];
+            /**
+             * @description Quem fez a operação. Só em transferências enviadas pela conta de uma
+             *     empresa (para saber qual membro pagou); null nos demais.
+             */
+            operator: components["schemas"]["Operator"] | null;
             /** @example 5b1e7c2d-3a4f-4e6b-8c9d-0a1b2c3d4e5f */
             id: string;
             /**
@@ -749,15 +771,20 @@ export interface components {
         TransferDto: {
             /**
              * Format: email
-             * @description E-mail de quem vai receber. Informe este ou `to_cpf`.
+             * @description E-mail de quem vai receber. Informe só um entre `to_email`, `to_cpf` e `to_cnpj`.
              * @example fulano@email.com
              */
             to_email?: string;
             /**
-             * @description CPF de quem vai receber, com ou sem pontuação. Informe este ou `to_email`.
+             * @description CPF de quem vai receber, com ou sem pontuação.
              * @example 529.982.247-25
              */
             to_cpf?: string;
+            /**
+             * @description CNPJ da empresa que vai receber, com ou sem pontuação.
+             * @example 11.222.333/0001-81
+             */
+            to_cnpj?: string;
             /**
              * @description Valor em reais, com no máximo 2 casas decimais
              * @example 200
@@ -829,6 +856,11 @@ export interface components {
             /** @description entrada (dinheiro chegou) ou saida (dinheiro saiu) */
             type: components["schemas"]["transaction_type"];
             category: components["schemas"]["transaction_category"];
+            /**
+             * @description Quem fez a operação. Só em transferências enviadas pela conta de uma
+             *     empresa (para saber qual membro pagou); null nos demais.
+             */
+            operator: components["schemas"]["Operator"] | null;
             /** @example 5b1e7c2d-3a4f-4e6b-8c9d-0a1b2c3d4e5f */
             id: string;
             /**
@@ -849,7 +881,7 @@ export interface components {
             reversal_of: string | null;
             /** Format: date-time */
             created_at: string;
-            /** @description Dono da conta em que o lançamento foi feito */
+            /** @description Dono da conta em que o lançamento foi feito (pessoa ou empresa) */
             owner: components["schemas"]["Counterparty"];
         };
         LoginDto: {
