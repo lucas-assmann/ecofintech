@@ -20,6 +20,11 @@ npm run preview        # serve o build
 
 A porta 5173 é fixa porque é a origem liberada no CORS da API (`CORS_ORIGINS`). Em produção, coloque o domínio do front nessa variável da API.
 
+## Deploy (Vercel)
+
+- Variável de ambiente `VITE_API_URL` com o endereço público da API (sem barra no final). Ela é lida **no build**: se mudar, faça um novo deploy.
+- `vercel.json` faz qualquer endereço servir o `index.html`, para o React Router cuidar da rota (sem isso, o link de `/redefinir-senha` enviado por e-mail daria 404).
+
 ## Scripts
 
 ```bash
