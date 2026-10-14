@@ -13,6 +13,7 @@ import { TransactionsModule } from './modules/transactions/transactions.module.j
 import { AuthModule } from './modules/auth/auth.module.js';
 import { DeactivationRequestsModule } from './modules/deactivation-requests/deactivation-requests.module.js';
 import { MailModule } from './modules/mail/mail.module.js';
+import { CompaniesModule } from './modules/companies/companies.module.js';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { MailModule } from './modules/mail/mail.module.js';
     AuthModule,
     DeactivationRequestsModule,
     MailModule,
+    CompaniesModule,
   ],
   controllers: [AppController],
   providers: [
