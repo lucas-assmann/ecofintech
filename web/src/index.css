@@ -1,0 +1,65 @@
+@import 'tailwindcss';
+
+/* Tema escuro por classe: <html class="dark"> liga as variantes dark:
+   (a classe é colocada pelo script do index.html e pelo botão de tema) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Paleta da marca: verde (eco) como cor principal */
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-brand-50: #ecfdf5;
+  --color-brand-100: #d1fae5;
+  --color-brand-200: #a7f3d0;
+  --color-brand-300: #6ee7b7;
+  --color-brand-400: #34d399;
+  --color-brand-500: #10b981;
+  --color-brand-600: #059669;
+  --color-brand-700: #047857;
+  --color-brand-800: #065f46;
+  --color-brand-900: #064e3b;
+  --color-brand-950: #022c22;
+
+  /* Séries dos gráficos: entradas (verde da marca) e saídas (laranja).
+     Par validado para daltonismo (ΔE ≥ 8) e contraste ≥ 3:1 no fundo branco. */
+  --color-entrada: #047857;
+  --color-saida: #eb6834;
+}
+
+/* No escuro, os mesmos tons ajustados para o fundo dos cards (#0f172a);
+   par também validado (ΔE ≥ 8 para daltonismo, contraste ≥ 3:1) */
+.dark {
+  --color-entrada: #059669;
+  --color-saida: #d95926;
+  /* Calendário, select e barras de rolagem nativos também no escuro */
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+  }
+
+  /* Tailwind 4 deixa botões com cursor padrão; aqui todo botão clicável vira "mãozinha" */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='tab'],
+  [role='radio'],
+  select:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  /* Valores monetários com dígitos de largura fixa (alinham em listas) */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
