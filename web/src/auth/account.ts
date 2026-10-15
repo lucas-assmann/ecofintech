@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react'
+
 // Conta com que a pessoa está operando (pessoal ou de empresa). Fica no
 // sessionStorage, como o token: vale só para esta aba.
 const ACCOUNT_KEY = 'ecofintech.account'
@@ -29,6 +31,19 @@ export function setActiveAccountId(id: string | null): void {
   // O que vai no cabeçalho e o que aparece na tela vêm deste mesmo valor:
   // quem mostra a conta ativa escuta o evento para se atualizar
   window.dispatchEvent(new Event(ACCOUNT_CHANGED_EVENT))
+}
+
+/**
+ * Conta ativa como estado do React: o componente renderiza de novo quando ela
+ * muda. Lê do mesmo lugar que o cabeçalho X-Account-Id, então nunca discordam.
+ */
+export function useActiveAccountId(): string | null {
+  return useSyncExternalStore(subscribe, getActiveAccountId)
+}
+
+function subscribe(onChange: () => void) {
+  window.addEventListener(ACCOUNT_CHANGED_EVENT, onChange)
+  return () => window.removeEventListener(ACCOUNT_CHANGED_EVENT, onChange)
 }
 
 /**
