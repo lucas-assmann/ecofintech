@@ -1,0 +1,36 @@
+# dependencies
+node_modules/
+
+# build
+dist/
+build/
+
+# prisma client (gerado por `prisma generate`)
+src/database/generated/
+
+# env
+.env
+.env.*
+!.env.example
+
+# logs
+logs/
+*.log
+npm-debug.log*
+
+# tests
+coverage/
+.nyc_output/
+
+# IDE / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+.DS_Store
+Thumbs.db
+
+# temp
+*.tsbuildinfo
+.temp/
+.tmp/

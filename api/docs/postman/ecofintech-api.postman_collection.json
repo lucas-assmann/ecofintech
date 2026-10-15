@@ -1,0 +1,2073 @@
+{
+  "info": {
+    "name": "Ecofintech API",
+    "description": "Requests da API da Ecofintech.\n\n**Fluxo (Run collection):** Health → Auth → Accounts → Transactions → Deactivation requests → Users → Encerrar sessão. O usuário de teste é cadastrado com CPF gerado automaticamente.\n\n**Recursos de admin** (depósito, estorno, listar lançamentos, listar/remover usuários, avaliar desativações): preencha `admin_email` e `admin_password` com um usuário admin (`UPDATE users SET role = 'admin' WHERE email = '...';`). Sem isso, essas requests são puladas.\n\n**Sessão:** trocar a senha, fazer logout ou ter a conta desativada invalida o token; a API responde 401 \"Sessão expirada. Faça login novamente.\" e o front deve voltar para o login.\n\nVariáveis preenchidas automaticamente: `user_id`, `user_email`, `user_cpf`, `token`, `admin_token`, `admin_cpf`, `transaction_id`, `deactivation_request_id`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "user_email",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_cpf",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_password",
+      "value": "senhaForte123",
+      "type": "string"
+    },
+    {
+      "key": "user_new_password",
+      "value": "novaSenha456",
+      "type": "string"
+    },
+    {
+      "key": "admin_email",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_password",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_cpf",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transaction_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "deposit_key",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transfer_key",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "deactivation_request_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reset_token",
+      "value": ""
+    },
+    {
+      "key": "company_cnpj",
+      "value": ""
+    },
+    {
+      "key": "company_id",
+      "value": ""
+    },
+    {
+      "key": "company_account_id",
+      "value": ""
+    },
+    {
+      "key": "invite_id",
+      "value": ""
+    },
+    {
+      "key": "cnpj_transfer_key",
+      "value": ""
+    },
+    {
+      "key": "company_transfer_key",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Verificar API",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "url": "{{base_url}}/",
+            "description": "Verifica se a API está no ar. Pública."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Cadastrar",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/users",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Maria Silva\",\n  \"email\": \"maria.{{$timestamp}}@email.com\",\n  \"date_of_birth\": \"1995-08-20\",\n  \"cpf\": \"{{user_cpf}}\",\n  \"phone\": \"(11) 98765-4321\",\n  \"password\": \"{{user_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Cadastra um usuário (POST /users) e cria a conta com saldo 0. Pública.\n\nCPF e telefone aceitam pontuação (são salvos só com dígitos); o CPF é validado pelos dígitos verificadores e não pode ser alterado depois. Um CPF válido é gerado automaticamente a cada execução (variável `user_cpf`).\n\nErros: 400 (dados inválidos), 409 (e-mail ou CPF já cadastrado)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Gera um CPF válido (dígitos verificadores corretos)",
+                  "const d = Array.from({ length: 9 }, () => Math.floor(Math.random() * 10));",
+                  "for (const pos of [9, 10]) {",
+                  "  const sum = d.slice(0, pos).reduce((acc, x, i) => acc + x * (pos + 1 - i), 0);",
+                  "  d.push(((sum * 10) % 11) % 10);",
+                  "}",
+                  "pm.collectionVariables.set('user_cpf', d.join(''));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const user = pm.response.json();",
+                  "pm.test('Não devolve a senha', () => pm.expect(user).to.not.have.any.keys('password', 'password_hash'));",
+                  "if (user.id) {",
+                  "  pm.collectionVariables.set('user_id', user.id);",
+                  "  pm.collectionVariables.set('user_email', user.email);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Faz login e devolve o token (salvo em `token`, usado automaticamente pelas outras requests). Pública.\n\nErros: 401 (e-mail ou senha inválidos), 403 (conta desativada)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Devolve o token', () => pm.expect(body.access_token).to.be.a('string'));",
+                  "if (body.access_token) pm.collectionVariables.set('token', body.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login admin",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Login com `admin_email` / `admin_password`. Salva `admin_token` e o CPF do admin (`admin_cpf`, usado na transferência por CPF).\n\nPulada se `admin_email` estiver vazio."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_email')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const token = pm.response.json().access_token;",
+                  "if (token) {",
+                  "  pm.collectionVariables.set('admin_token', token);",
+                  "  pm.sendRequest({",
+                  "    url: pm.variables.replaceIn('{{base_url}}/auth/me'),",
+                  "    header: { Authorization: 'Bearer ' + token },",
+                  "  }, (err, res) => {",
+                  "    if (!err && res.code === 200) pm.collectionVariables.set('admin_cpf', res.json().cpf);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Esqueci minha senha",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/forgot-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Envia um e-mail com o link para criar uma nova senha (vale 30 minutos, uso único). A resposta é **sempre a mesma**, exista ou não o e-mail, para não revelar quem tem conta. No máximo um e-mail por minuto por usuário.\n\nEm desenvolvimento os e-mails chegam no Mailpit: http://localhost:8025. Copie o `token` do link para a variável `reset_token` e rode a próxima request."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Mensagem genérica', () => pm.expect(pm.response.json().message).to.include('Se o e-mail estiver cadastrado'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Redefinir senha (token do e-mail)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/auth/reset-password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{reset_token}}\",\n  \"new_password\": \"novaSenha456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Troca a senha com o `token` recebido no link do e-mail. Encerra todas as sessões do usuário (os tokens de acesso antigos passam a responder 401).\n\nPulada se `reset_token` estiver vazio.\n\nErros: 400 (senha com menos de 8 caracteres, ou link inválido, expirado ou já usado)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reset_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Usuário logado (me)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/auth/me",
+            "description": "Dados do usuário dono do token (inclui `cpf`, `phone`, `role` e `status`).\n\nErros: 401 (sessão expirada)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('É o usuário logado', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('user_id')));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Accounts",
+      "item": [
+        {
+          "name": "Minhas contas",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/accounts",
+            "description": "Contas que o usuário pode usar: a pessoal primeiro, depois as empresas das quais é dono ou membro (por nome). O `id` de cada uma é o valor do cabeçalho `X-Account-Id` para operar com ela."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Primeira é a conta pessoal', () => pm.expect(pm.response.json()[0].kind).to.eql('personal'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Meu saldo",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/accounts/me",
+            "description": "Conta e saldo do usuário logado (texto com 2 casas, ex.: \"200.00\")."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Saldo com 2 casas', () => pm.expect(pm.response.json().balance).to.match(/^\\d+\\.\\d{2}$/));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "description": "Movimentações são imutáveis: correções são feitas por estorno (admin).\n\n**Depósito e transferência exigem o header `Idempotency-Key`** (um UUID novo por operação). Reenviar a mesma chave com os mesmos dados devolve o lançamento original, com o header `Idempotent-Replayed: true`, sem mover o dinheiro de novo. As requests geram a chave automaticamente.",
+      "item": [
+        {
+          "name": "Depositar (admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{deposit_key}}"
+              }
+            ],
+            "url": "{{base_url}}/transactions/deposit",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to_cpf\": \"{{user_cpf}}\",\n  \"amount\": 200,\n  \"description\": \"Depósito inicial\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Deposita na conta de um usuário, identificado por `to_email` ou `to_cpf`. **Somente admin.** O lançamento registra qual admin fez o depósito.\n\nPulada se `admin_token` estiver vazio.\n\nErros: 400 (dados ou Idempotency-Key inválidos), 401, 403 (não é admin), 404 (destinatário não encontrado), 422 (conta desativada ou chave reutilizada com outros dados)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('deposit_key', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Lançamento de entrada', () => pm.expect(pm.response.json().type).to.eql('entrada'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transferir por e-mail",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{transfer_key}}"
+              }
+            ],
+            "url": "{{base_url}}/transactions/transfer",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to_email\": \"{{admin_email}}\",\n  \"amount\": 30,\n  \"description\": \"Pagamento\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Transfere do usuário logado para outro, pelo e-mail. Gera saída na origem e entrada no destino; a resposta é o lançamento de saída.\n\nNo fluxo da collection, envia 30 para o admin. Pulada se `admin_email` estiver vazio.\n\nErros: 400 (dados inválidos, para a própria conta, e-mail e CPF juntos ou Idempotency-Key ausente), 401, 404 (destinatário não encontrado), 422 (saldo insuficiente, conta de destino desativada ou chave reutilizada com outros dados)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_email')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('transfer_key', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const tx = pm.response.json();",
+                  "pm.test('Lançamento de saída', () => pm.expect(tx.type).to.eql('saida'));",
+                  "if (tx.id) pm.collectionVariables.set('transaction_id', tx.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Repetir transferência (mesma chave)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{transfer_key}}"
+              }
+            ],
+            "url": "{{base_url}}/transactions/transfer",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to_email\": \"{{admin_email}}\",\n  \"amount\": 30,\n  \"description\": \"Pagamento\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Reenvia **a mesma transferência com a mesma `Idempotency-Key`**, como faria um app que perdeu a resposta. A API devolve o lançamento original com `Idempotent-Replayed: true` e **não transfere de novo**.\n\nPulada se `admin_email` estiver vazio."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_email')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Header Idempotent-Replayed', () => pm.expect(pm.response.headers.get('Idempotent-Replayed')).to.eql('true'));",
+                  "pm.test('Mesmo lançamento da primeira vez', () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('transaction_id')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transferir por CPF",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": "{{base_url}}/transactions/transfer",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to_cpf\": \"{{admin_cpf}}\",\n  \"amount\": 20,\n  \"description\": \"Pagamento por CPF\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Mesma transferência, identificando quem recebe pelo CPF (com ou sem pontuação). Informe `to_email` **ou** `to_cpf`, nunca os dois.\n\nNo fluxo da collection, envia 20 para o admin. Pulada se `admin_cpf` estiver vazio."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_cpf')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estornar (admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/transactions/{{transaction_id}}/reverse",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Transferência contestada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Estorna um lançamento. **Somente admin.** Em transferências, desfaz as duas pontas (devolve para quem enviou e retira de quem recebeu). Cada lançamento só pode ser estornado uma vez, e estorno não se estorna.\n\nNo fluxo da collection, estorna a \"Transferir por e-mail\" (30).\n\nErros: 401, 403, 404, 409 (já estornada), 422 (saldo insuficiente para o estorno, conta desativada ou tentativa de estornar um estorno)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const entries = pm.response.json();",
+                  "pm.test('Dois lançamentos de estorno', () => pm.expect(entries.map((e) => e.category)).to.eql(['estorno', 'estorno']));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extrato",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/transactions?limit=50&offset=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "transactions"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Itens por página (1 a 100)"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Quantos itens pular"
+                }
+              ]
+            },
+            "description": "Extrato do usuário logado, do mais recente para o mais antigo. Estornos aparecem com `category: \"estorno\"` e `reversal_of` apontando para o lançamento estornado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Retorna uma lista', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resumo do período (dashboard)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/transactions/summary?days=30",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "transactions",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "30",
+                  "description": "Período em dias, contando hoje: 7, 30 ou 90"
+                }
+              ]
+            },
+            "description": "Totais de entradas e saídas do usuário logado no período, para o dashboard: `total_entradas`, `total_saidas`, `resultado`, `series` (um item por dia, ou por semana em 90 dias, inclusive os zerados) e `by_category`. Os dias seguem o horário de Brasília.\n\nErros: 400 (período diferente de 7, 30 ou 90), 401."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Um item por dia no período', () => pm.expect(pm.response.json().series).to.have.length(30));",
+                  "pm.test('Resultado = entradas - saídas', () => {",
+                  "  const s = pm.response.json();",
+                  "  pm.expect(Number(s.resultado)).to.be.closeTo(Number(s.total_entradas) - Number(s.total_saidas), 0.001);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar lançamento",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/transactions/{{transaction_id}}",
+            "description": "Detalhe de um lançamento: o usuário vê só os da própria conta; o admin vê qualquer um.\n\nErros: 400 (id não é UUID), 401, 404 (não existe ou é de outra conta)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('transaction_id')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar todos os lançamentos (admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/transactions/all?search={{user_cpf}}&limit=50&offset=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "transactions",
+                "all"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "{{user_cpf}}",
+                  "description": "Parte do nome, e-mail ou CPF do dono da conta"
+                },
+                {
+                  "key": "category",
+                  "value": "transferencia",
+                  "description": "deposito, transferencia ou estorno",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "saida",
+                  "description": "entrada ou saida",
+                  "disabled": true
+                },
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "description": "Data inicial (AAAA-MM-DD, inclusive, horário de Brasília)",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "description": "Data final (AAAA-MM-DD, inclusive, horário de Brasília)",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Itens por página (1 a 100)"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Quantos itens pular"
+                }
+              ]
+            },
+            "description": "Todos os lançamentos do sistema, mais recentes primeiro, com o dono de cada conta em `owner`. **Somente admin.** Todos os filtros são opcionais; aqui a busca vem preenchida com o CPF do usuário de teste.\n\nPulada se `admin_token` estiver vazio.\n\nErros: 400 (filtro inválido), 401, 403 (não é admin)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Só lançamentos do usuário buscado', () => {",
+                  "  const items = pm.response.json();",
+                  "  pm.expect(items.length).to.be.above(0);",
+                  "  items.forEach((t) => pm.expect(t.owner.email).to.eql(pm.collectionVariables.get('user_email')));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Deactivation requests",
+      "description": "O usuário solicita a desativação; o suporte (admin) aprova ou recusa. Aprovar exige saldo zerado, bloqueia login e movimentações e mantém o histórico.",
+      "item": [
+        {
+          "name": "Solicitar desativação",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/deactivation-requests",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Não vou mais usar a conta\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Solicita a desativação da própria conta. Responde 202 com a mensagem \"Sua solicitação foi recebida. O suporte avaliará a solicitação.\"\n\nErros: 401, 409 (já existe uma solicitação em análise)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 202', () => pm.response.to.have.status(202));",
+                  "const body = pm.response.json();",
+                  "pm.test('Mensagem do suporte', () => pm.expect(body.message).to.include('suporte avaliará'));",
+                  "if (body.request) pm.collectionVariables.set('deactivation_request_id', body.request.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Minha solicitação",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/deactivation-requests/me",
+            "description": "Situação da última solicitação do usuário: `pending` (em análise), `approved` (conta desativada) ou `rejected` (recusada).\n\nErros: 401, 404 (nenhuma solicitação)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar solicitações (admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/deactivation-requests?status=pending",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "deactivation-requests"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "description": "pending | approved | rejected (opcional)"
+                }
+              ]
+            },
+            "description": "Fila de solicitações para o suporte, mais antigas primeiro. **Somente admin.**\n\nPulada se `admin_token` estiver vazio."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Aprovar (admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/deactivation-requests/{{deactivation_request_id}}/approve",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Conta encerrada a pedido do cliente\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Aprova e desativa a conta. **Somente admin.** Exige saldo zerado.\n\nNo fluxo da collection, o usuário de teste ainda tem saldo, então o esperado aqui é 409.\n\nErros: 401, 403, 404, 409 (já avaliada ou conta com saldo)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 aprovada, 409 com saldo ou já avaliada', () => pm.expect(pm.response.code).to.be.oneOf([200, 409]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recusar (admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/deactivation-requests/{{deactivation_request_id}}/reject",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Cliente precisa zerar o saldo antes\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Recusa a solicitação; a conta continua ativa e o usuário pode solicitar de novo. **Somente admin.**\n\nErros: 401, 403, 404, 409 (já avaliada)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 recusada, 409 já avaliada', () => pm.expect(pm.response.code).to.be.oneOf([200, 409]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Companies & invites",
+      "description": "Contas de empresa. Aqui o **admin** abre uma empresa (é o dono) e convida o usuário de teste, que aceita, opera a conta da empresa com o cabeçalho `X-Account-Id` e depois sai. Puladas se `admin_token` estiver vazio.\n\nCada execução cria uma empresa nova (CNPJ gerado) com o admin como dono.",
+      "item": [
+        {
+          "name": "Abrir empresa (admin é o dono)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/companies",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cnpj\": \"{{company_cnpj}}\",\n  \"legal_name\": \"Empresa de Teste LTDA\",\n  \"trade_name\": \"Empresa de Teste\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Abre uma empresa: quem abre vira o dono e a conta é criada na hora. CNPJ com ou sem pontuação.\n\nErros: 400 (CNPJ ou nomes inválidos), 409 (CNPJ já cadastrado)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const base = Array.from({ length: 12 }, (_, i) => (i < 8 ? Math.floor(Math.random() * 10) : [0, 0, 0, 1][i - 8]));",
+                  "const digit = (nums) => {",
+                  "  const weights = nums.length === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];",
+                  "  const rest = nums.reduce((acc, n, i) => acc + n * weights[i], 0) % 11;",
+                  "  return rest < 2 ? 0 : 11 - rest;",
+                  "};",
+                  "const first = digit(base);",
+                  "pm.collectionVariables.set('company_cnpj', [...base, first, digit([...base, first])].join(''));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const account = pm.response.json();",
+                  "pm.test('Admin é o dono', () => pm.expect(account.role).to.eql('owner'));",
+                  "pm.collectionVariables.set('company_id', account.company_id);",
+                  "pm.collectionVariables.set('company_account_id', account.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Convidar usuário de teste (dono)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/companies/{{company_id}}/invites",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"{{user_cpf}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Convida alguém já cadastrado por `email` ou `cpf` (só um). Somente o dono.\n\nErros: 400, 403 (não é o dono), 404 (usuário não encontrado), 409 (já é membro ou já tem convite pendente), 422 (si mesmo ou usuário desativado)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Meus convites",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/invites",
+            "description": "Convites pendentes do usuário logado."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const invite = pm.response.json().find((i) => i.company.id === pm.collectionVariables.get('company_id'));",
+                  "pm.test('Convite da empresa de teste', () => pm.expect(invite).to.exist);",
+                  "if (invite) pm.collectionVariables.set('invite_id', invite.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Aceitar convite",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/invites/{{invite_id}}/accept",
+            "description": "Aceita o convite e entra na empresa como membro.\n\nErros: 404 (não é dele ou já respondido)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Membros da empresa",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/companies/{{company_id}}/members",
+            "description": "Membros da empresa (qualquer membro vê). Os convites pendentes só aparecem para o dono."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Dono primeiro, depois o usuário de teste', () => { pm.expect(body.members[0].role).to.eql('owner'); pm.expect(body.members.map((m) => m.email)).to.include(pm.collectionVariables.get('user_email')); });",
+                  "pm.test('Membro não vê convites', () => pm.expect(body.invites).to.eql([]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extrato da empresa (X-Account-Id)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Account-Id",
+                "value": "{{company_account_id}}"
+              }
+            ],
+            "url": "{{base_url}}/transactions?limit=10&offset=0",
+            "description": "Com o cabeçalho `X-Account-Id`, as rotas de conta, extrato, resumo e transferência usam a conta indicada (pessoal ou de empresa da qual a pessoa é membro). Sem acesso: 403 \"Sem acesso a esta conta\"."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transferir para a empresa (CNPJ)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{cnpj_transfer_key}}"
+              }
+            ],
+            "url": "{{base_url}}/transactions/transfer",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to_cnpj\": \"{{company_cnpj}}\",\n  \"amount\": 5,\n  \"description\": \"Pagamento à empresa\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Da conta pessoal do usuário de teste para a empresa, pelo CNPJ (com ou sem pontuação). Informe só um entre `to_email`, `to_cpf` e `to_cnpj`."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('cnpj_transfer_key', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Contraparte é a empresa', () => pm.expect(pm.response.json().counterparty.kind).to.eql('company'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transferir pela conta da empresa (\"feita por\")",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{company_transfer_key}}"
+              },
+              {
+                "key": "X-Account-Id",
+                "value": "{{company_account_id}}"
+              }
+            ],
+            "url": "{{base_url}}/transactions/transfer",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to_email\": \"{{admin_email}}\",\n  \"amount\": 2,\n  \"description\": \"Pago pela empresa\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Um membro paga pela conta da empresa (cabeçalho `X-Account-Id`). O lançamento de saída traz `operator` com o nome de quem fez; quem recebe vê a empresa como remetente."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('company_transfer_key', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Feita pelo usuário de teste', () => pm.expect(pm.response.json().operator).to.have.property('name'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sair da empresa",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/companies/{{company_id}}/leave",
+            "description": "O membro sai da empresa. O dono não pode sair (422)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extrato da empresa depois de sair (403)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Account-Id",
+                "value": "{{company_account_id}}"
+              }
+            ],
+            "url": "{{base_url}}/transactions?limit=10&offset=0",
+            "description": "Quem saiu (ou foi removido) perde o acesso na hora."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Mensagem', () => pm.expect(pm.response.json().message).to.eql('Sem acesso a esta conta'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Convidar de novo (dono)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/companies/{{company_id}}/invites",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Membros e convites (dono)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/companies/{{company_id}}/members"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const invites = pm.response.json().invites;",
+                  "pm.test('Dono vê o convite pendente', () => pm.expect(invites).to.have.length(1));",
+                  "if (invites.length) pm.collectionVariables.set('invite_id', invites[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancelar convite (dono)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/companies/{{company_id}}/invites/{{invite_id}}",
+            "description": "Cancela um convite pendente. Somente o dono. Erros: 403, 404 (não está pendente)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "description": "Buscar, Atualizar e Alterar senha só funcionam no próprio usuário (senão 403). Listar e Remover são somente admin.",
+      "item": [
+        {
+          "name": "Listar usuários (admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": "{{base_url}}/users",
+            "description": "Lista todos os usuários. **Somente admin.**\n\nPulada se `admin_token` estiver vazio."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar usuário",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/users/{{user_id}}",
+            "description": "Busca o próprio usuário pelo id.\n\nErros: 400, 401, 403 (não é o próprio usuário), 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Atualizar usuário",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/users/{{user_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Maria S. Souza\",\n  \"phone\": \"(21) 3333-4444\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Atualiza só os campos enviados (`name`, `email`, `date_of_birth`, `phone`). Senha tem rota própria e o CPF não pode ser alterado.\n\nErros: 400, 401, 403, 404, 409."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alterar senha",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/users/{{user_id}}/password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"{{user_password}}\",\n  \"new_password\": \"{{user_new_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Altera a senha (exige a atual). **Invalida todos os tokens**: o token usado aqui deixa de funcionar e é preciso logar de novo.\n\nO script confere que o token antigo recebe 401, troca `user_password`/`user_new_password` de lugar e faz login de novo automaticamente.\n\nErros: 400 (senha atual incorreta ou nova senha inválida), 401, 403, 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));",
+                  "if (pm.response.code === 204) {",
+                  "  const oldToken = pm.collectionVariables.get('token');",
+                  "  const current = pm.collectionVariables.get('user_password');",
+                  "  pm.collectionVariables.set('user_password', pm.collectionVariables.get('user_new_password'));",
+                  "  pm.collectionVariables.set('user_new_password', current);",
+                  "",
+                  "  pm.sendRequest({ url: pm.variables.replaceIn('{{base_url}}/auth/me'), header: { Authorization: 'Bearer ' + oldToken } }, (err, res) => {",
+                  "    pm.test('Token antigo foi invalidado (401)', () => pm.expect(res.code).to.eql(401));",
+                  "  });",
+                  "",
+                  "  pm.sendRequest({",
+                  "    url: pm.variables.replaceIn('{{base_url}}/auth/login'),",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json' },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ email: pm.collectionVariables.get('user_email'), password: pm.collectionVariables.get('user_password') }) },",
+                  "  }, (err, res) => {",
+                  "    pm.test('Login com a nova senha', () => pm.expect(res.code).to.eql(200));",
+                  "    if (res.code === 200) pm.collectionVariables.set('token', res.json().access_token);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Encerrar sessão",
+      "item": [
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/logout",
+            "description": "Encerra a sessão: invalida todos os tokens do usuário. O front deve voltar para o login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Usuário logado após logout",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/auth/me",
+            "description": "Com o token de antes do logout, a API responde 401 \"Sessão expirada. Faça login novamente.\""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Mensagem de sessão expirada', () => pm.expect(pm.response.json().message).to.include('Sessão expirada'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remover usuário (admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "url": "{{base_url}}/users/{{user_id}}",
+            "description": "Remove um usuário (e a conta). **Somente admin.** Se a conta tiver movimentações, retorna 409 (o histórico financeiro não pode ser apagado; use a desativação).\n\nPulada se `admin_token` estiver vazio."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('admin_token')) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 sem movimentações, 409 com movimentações', () => pm.expect(pm.response.code).to.be.oneOf([204, 409]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

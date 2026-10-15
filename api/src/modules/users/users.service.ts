@@ -1,0 +1,173 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { PrismaService } from '../../database/prisma.service.js';
+import { Prisma } from '../../database/generated/prisma/client.js';
+import { hashPassword, verifyPassword } from '../../common/utils/password.js';
+import { CreateUserDto } from './dto/create-user.dto.js';
+import { UpdateUserDto } from './dto/update-user.dto.js';
+import { UpdatePasswordDto } from './dto/update-password.dto.js';
+import { User } from './entities/user.entity.js';
+
+// Campos devolvidos pela API. password_hash nunca entra aqui.
+const userSelect = {
+  id: true,
+  name: true,
+  email: true,
+  date_of_birth: true,
+  cpf: true,
+  phone: true,
+  role: true,
+  status: true,
+  created_at: true,
+  updated_at: true,
+} satisfies Prisma.usersSelect;
+
+type SelectedUser = Prisma.usersGetPayload<{ select: typeof userSelect }>;
+
+@Injectable()
+export class UsersService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async create(dto: CreateUserDto): Promise<User> {
+    try {
+      const user = await this.prisma.users.create({
+        data: {
+          name: dto.name,
+          email: dto.email.toLowerCase(),
+          date_of_birth: new Date(dto.date_of_birth),
+          cpf: dto.cpf,
+          phone: dto.phone,
+          password_hash: await hashPassword(dto.password),
+          // Cria a conta (saldo 0) junto, no mesmo INSERT atômico
+          accounts: { create: {} },
+        },
+        select: userSelect,
+      });
+      return toUser(user);
+    } catch (error) {
+      throw handlePrismaError(error);
+    }
+  }
+
+  async findAll(): Promise<User[]> {
+    const users = await this.prisma.users.findMany({
+      select: userSelect,
+      orderBy: { created_at: 'desc' },
+    });
+    return users.map(toUser);
+  }
+
+  async findOne(id: string): Promise<User> {
+    const user = await this.prisma.users.findUnique({
+      where: { id },
+      select: userSelect,
+    });
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+    return toUser(user);
+  }
+
+  async update(id: string, dto: UpdateUserDto): Promise<User> {
+    try {
+      // Campos undefined são ignorados pelo Prisma: só o que foi enviado é atualizado
+      const user = await this.prisma.users.update({
+        where: { id },
+        data: {
+          name: dto.name,
+          email: dto.email?.toLowerCase(),
+          date_of_birth: dto.date_of_birth
+            ? new Date(dto.date_of_birth)
+            : undefined,
+          phone: dto.phone,
+          updated_at: new Date(),
+        },
+        select: userSelect,
+      });
+      return toUser(user);
+    } catch (error) {
+      throw handlePrismaError(error);
+    }
+  }
+
+  async updatePassword(id: string, dto: UpdatePasswordDto): Promise<void> {
+    const user = await this.prisma.users.findUnique({
+      where: { id },
+      select: { password_hash: true },
+    });
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+
+    const valid = await verifyPassword(
+      dto.current_password,
+      user.password_hash,
+    );
+    if (!valid) throw new BadRequestException('Senha atual incorreta');
+
+    await this.prisma.users.update({
+      where: { id },
+      data: {
+        password_hash: await hashPassword(dto.new_password),
+        // Invalida todos os tokens: é preciso fazer login de novo com a nova senha
+        token_version: { increment: 1 },
+        updated_at: new Date(),
+      },
+    });
+  }
+
+  /** Remove o usuário e registra no audit_logs quem removeu e quem era. */
+  async remove(actor_id: string, id: string): Promise<void> {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // delete devolve a linha apagada: os dados vão para o registro de auditoria
+        const removed = await tx.users.delete({
+          where: { id },
+          select: { name: true, email: true, cpf: true },
+        });
+        await tx.audit_logs.create({
+          data: {
+            actor_id,
+            action: 'user.delete',
+            target_type: 'user',
+            target_id: id,
+            details: removed,
+          },
+        });
+      });
+    } catch (error) {
+      throw handlePrismaError(error);
+    }
+  }
+}
+
+// DATE do banco vem como Date (meia-noite UTC); a API devolve só 'YYYY-MM-DD'
+function toUser(user: SelectedUser): User {
+  return {
+    ...user,
+    date_of_birth: user.date_of_birth.toISOString().slice(0, 10),
+  };
+}
+
+function handlePrismaError(error: unknown): unknown {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === 'P2002') {
+      // O erro informa qual constraint UNIQUE foi violada
+      const field = JSON.stringify(error.meta ?? {}).includes('cpf')
+        ? 'CPF'
+        : 'E-mail';
+      return new ConflictException(`${field} já cadastrado`);
+    }
+    if (error.code === 'P2025') {
+      return new NotFoundException('Usuário não encontrado');
+    }
+    // Chave estrangeira (ON DELETE RESTRICT): a conta tem movimentações ou o
+    // usuário executou operações registradas (ex.: admin que fez depósitos)
+    if (error.code === 'P2003') {
+      return new ConflictException(
+        'Usuário possui movimentações ou operações registradas e não pode ser removido. Use a desativação.',
+      );
+    }
+  }
+  return error;
+}
