@@ -6,6 +6,7 @@ import { ApiError } from './api/client'
 import { AuthProvider } from './auth/AuthProvider'
 import { AccountProvider } from './auth/AccountProvider'
 import { App } from './App'
+import { ServerWakeBanner } from './components/ServerWakeBanner'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -21,6 +22,7 @@ const queryClient = new QueryClient({
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+    <ServerWakeBanner />
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
