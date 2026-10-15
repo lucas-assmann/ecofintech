@@ -122,6 +122,7 @@ model idempotency_keys {
   users          users         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([user_id, key])
+  @@index([created_at])
 }
 
 model password_reset_tokens {

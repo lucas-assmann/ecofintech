@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule, minutes } from '@nestjs/throttler';
 import { validateEnv } from './config/env.validation.js';
 import { AuthGuard } from './common/guards/auth.guard.js';
@@ -27,6 +28,8 @@ import { InvitesModule } from './modules/invites/invites.module.js';
       throttlers: [{ limit: 100, ttl: minutes(1) }],
       errorMessage: 'Muitas tentativas. Aguarde um minuto e tente de novo.',
     }),
+    // Tarefas agendadas (@Cron), ex.: limpeza das chaves de idempotência
+    ScheduleModule.forRoot(),
     DatabaseModule,
     UsersModule,
     AccountsModule,
