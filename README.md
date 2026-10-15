@@ -57,6 +57,7 @@ Primeira vez:
 2. Configure `DATABASE_URL` no `.env`.
 3. `npm run db:migrate` para criar as tabelas.
 4. `npm run db:pull` para gerar o client do Prisma.
+5. Deixe o banco em UTC: `ALTER DATABASE ecofintech SET timezone TO 'UTC';`. O adaptador do Prisma ignora o fuso das colunas `TIMESTAMPTZ`, então em outro fuso toda data fica deslocada. A API confere isso ao ligar e não sobe se o banco não estiver em UTC. O horário de Brasília é só na exibição, no front. (O Neon já vem em UTC/GMT.)
 
 A API valida o `.env` ao iniciar (`src/config/env.validation.ts`): se faltar uma variável ou ela estiver errada (ex.: `JWT_SECRET` com menos de 32 caracteres), ela não sobe e lista o que corrigir.
 
@@ -185,7 +186,7 @@ Garantias:
 - Saldo e lançamentos são gravados na mesma transação do banco: ou tudo é aplicado, ou nada.
 - O débito só acontece se houver saldo (`422 Saldo insuficiente`), e o banco tem `CHECK (balance >= 0)` como segunda barreira. Transferências simultâneas nunca deixam o saldo negativo.
 - As duas contas de uma transferência são travadas sempre na mesma ordem (por id), evitando deadlock.
-- **Idempotência:** depósito e transferência exigem o header `Idempotency-Key` (UUID). O front gera um UUID novo por operação e, se precisar reenviar (ex.: a resposta não chegou), manda **a mesma chave**: a API devolve o lançamento original com o header `Idempotent-Replayed: true`, sem mover o dinheiro de novo. A mesma chave com dados diferentes é recusada (`422`). Uma operação que falhou não consome a chave.
+- **Idempotência:** depósito e transferência exigem o header `Idempotency-Key` (UUID). O front gera um UUID novo por operação e, se precisar reenviar (ex.: a resposta não chegou), manda **a mesma chave**: a API devolve o lançamento original com o header `Idempotent-Replayed: true`, sem mover o dinheiro de novo. A mesma chave com dados diferentes é recusada (`422`). Uma operação que falhou não consome a chave. As chaves valem **24 horas**: o `IdempotencyCleanupService` apaga as vencidas todo dia às 3h (UTC) e sempre que a API liga (no Render gratuito ela dorme e pode perder o horário).
 - **Auditoria:** cada lançamento guarda quem o executou (`created_by`: o admin no depósito e no estorno, o remetente na transferência) e um `operation_id` comum às pontas da mesma operação. Remoções de usuário ficam em `audit_logs` (quem removeu e os dados do removido). Quem tem operações registradas não pode ser removido; use a desativação.
 - Lançamentos são imutáveis (sem rotas de edição ou exclusão). Um usuário com movimentações não pode ser removido (`409`); para encerrar a conta, use a desativação.
 - O saldo deve sempre bater com o extrato. Para conferir no banco:
